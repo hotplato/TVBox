@@ -170,7 +170,7 @@ public class JsLoader {
         try {
             Log.i("JSLoader", "echo-createSpider load");
             Spider sp = new JsSpider(key, api, classLoader);
-            sp.init(App.getInstance(), ext);
+            sp.init(SpiderHostContext.get(App.getInstance()), ext);
             return sp;
         } catch (Throwable th) {
             LOG.i("echo-getSpider-error "+th.getMessage());

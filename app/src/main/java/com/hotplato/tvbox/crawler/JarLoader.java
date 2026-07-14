@@ -48,7 +48,7 @@ public class JarLoader {
                     Class classInit = classLoader.loadClass("com.github.catvod.spider.Init");
                     if (classInit != null) {
                         Method method = classInit.getMethod("init", Context.class);
-                        method.invoke(null, App.getInstance());
+                        method.invoke(null, SpiderHostContext.get(App.getInstance()));
                         System.out.println("自定义爬虫代码加载成功!");
                         success = true;
                         try {
@@ -109,7 +109,7 @@ public class JarLoader {
         String clsKey = cls.startsWith("csp_") ? cls.substring(4) : cls;
         try {
             Spider sp = (Spider) classLoader.loadClass("com.github.catvod.spider." + clsKey).newInstance();
-            sp.init(App.getInstance(), ext);
+            sp.init(SpiderHostContext.get(App.getInstance()), ext);
             spiders.put(key, sp);
             return sp;
         } catch (Throwable th) {

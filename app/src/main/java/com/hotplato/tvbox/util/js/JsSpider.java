@@ -44,6 +44,8 @@ public class JsSpider extends Spider {
     private final String key;
     private final String api;
     private boolean cat;
+    /** 远程依赖拉空时记录，避免 compileModule(\"\") 导致 QuickJS SIGSEGV */
+    private String failedModule;
 
     public JsSpider(String key, String api, Class<?> cls) throws Exception {
         this.key = "J" + MD5.encode(key);
@@ -188,10 +190,24 @@ public class JsSpider extends Spider {
 
     @Override
     public void destroy() {
-        submit(() -> {
-            executor.shutdownNow();
-            ctx.destroy();
-        });
+        try {
+            submit(() -> {
+                try {
+                    if (ctx != null) {
+                        ctx.destroy();
+                        ctx = null;
+                    }
+                } finally {
+                    executor.shutdownNow();
+                }
+                return null;
+            });
+        } catch (Throwable ignored) {
+            try {
+                executor.shutdownNow();
+            } catch (Throwable ignored2) {
+            }
+        }
     }
 
     private static final String SPIDER_STRING_CODE = "import * as spider from '%s'\n\n" +
@@ -205,37 +221,69 @@ public class JsSpider extends Spider {
             "    }\n" +
             "}";
     private void initializeJS() throws Exception {
-        submit(() -> {
-            if (ctx == null) createCtx();
-            if (dex != null) createDex();
+        try {
+            submit(() -> {
+                String content = FileUtils.loadModule(api);
+                if (TextUtils.isEmpty(content)) {
+                    throw new IllegalStateException("JS spider api empty: " + api);
+                }
+                // 先预检依赖，失败则绝不进入 QuickJS evaluate（原生 SIGSEGV 无法被 Java 捕获）
+                String missing = JsModulePreflight.findMissing(api, content);
+                if (missing != null) {
+                    throw new IllegalStateException("JS module empty: " + missing);
+                }
 
-            String content = FileUtils.loadModule(api);            
-            if (TextUtils.isEmpty(content)) {return null;}
-            
-            if(content.startsWith("//bb")){
-                cat = true;
-                byte[] b = Base64.decode(content.replace("//bb",""), 0);
-                ctx.execute(byteFF(b), key + ".js");
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js") + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
-                //ctx.execute(byteFF(b), key + ".js","__jsEvalReturn");
-                //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");
-            } else {
-                if (content.contains("__JS_SPIDER__")) {
-                    content = content.replaceAll("__JS_SPIDER__\\s*=", "export default ");
-                }
-                String moduleExtName = "default";
-                if (content.contains("__jsEvalReturn") && !content.contains("export default")) {
-                    moduleExtName = "__jsEvalReturn";
+                if (ctx == null) createCtx();
+                if (dex != null) createDex();
+
+                if (content.startsWith("//bb")) {
                     cat = true;
+                    byte[] b = Base64.decode(content.replace("//bb", ""), 0);
+                    ctx.execute(byteFF(b), key + ".js");
+                    ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js")
+                            + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
+                } else {
+                    if (content.contains("__JS_SPIDER__")) {
+                        content = content.replaceAll("__JS_SPIDER__\\s*=", "export default ");
+                    }
+                    if (content.contains("__jsEvalReturn") && !content.contains("export default")) {
+                        cat = true;
+                    }
+                    ctx.evaluateModule(content, api);
+                    if (failedModule != null) {
+                        throw new IllegalStateException("JS module empty: " + failedModule);
+                    }
+                    ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api)
+                            + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
                 }
-                ctx.evaluateModule(content, api);
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api) + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
-                //ctx.evaluateModule(content, api, moduleExtName);
-                //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");                
+                if (failedModule != null) {
+                    throw new IllegalStateException("JS module empty: " + failedModule);
+                }
+                jsObject = (JSObject) ctx.get(ctx.getGlobalObject(), key);
+                if (jsObject == null) {
+                    throw new IllegalStateException("JS spider export missing: " + api);
+                }
+                return null;
+            }).get();
+        } catch (ExecutionException e) {
+            destroyQuietly();
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
             }
-            jsObject = (JSObject) ctx.get(ctx.getGlobalObject(), key);
-            return null;
-        }).get();
+            throw new Exception(cause);
+        } catch (InterruptedException e) {
+            destroyQuietly();
+            Thread.currentThread().interrupt();
+            throw e;
+        }
+    }
+
+    private void destroyQuietly() {
+        try {
+            destroy();
+        } catch (Throwable ignored) {
+        }
     }
 
     public static byte[] byteFF(byte[] bytes) {
@@ -252,13 +300,15 @@ public class JsSpider extends Spider {
             public byte[] getModuleBytecode(String moduleName) {
                 String ss = FileUtils.loadModule(moduleName);
                 if (TextUtils.isEmpty(ss)) {
-                    LOG.i("echo-getModuleBytecode empty :"+ moduleName);
-                    return ctx.compileModule("", moduleName);
+                    LOG.i("echo-getModuleBytecode empty :" + moduleName);
+                    failedModule = moduleName;
+                    // 预检应已拦住；此处绝不 compile/evaluate，直接失败让上层变 SpiderNull
+                    throw new IllegalStateException("JS module empty: " + moduleName);
                 }
-                if(ss.startsWith("//DRPY")){
-                    return Base64.decode(ss.replace("//DRPY",""), Base64.URL_SAFE);
-                } else if(ss.startsWith("//bb")){
-                    byte[] b = Base64.decode(ss.replace("//bb",""), 0);
+                if (ss.startsWith("//DRPY")) {
+                    return Base64.decode(ss.replace("//DRPY", ""), Base64.URL_SAFE);
+                } else if (ss.startsWith("//bb")) {
+                    byte[] b = Base64.decode(ss.replace("//bb", ""), 0);
                     return byteFF(b);
                 } else {
                     if (moduleName.contains("cheerio.min.js")) {

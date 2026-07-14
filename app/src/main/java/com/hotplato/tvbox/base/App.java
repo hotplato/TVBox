@@ -8,6 +8,8 @@ import com.github.catvod.Init;
 import com.hotplato.tvbox.callback.EmptyCallback;
 import com.hotplato.tvbox.callback.LoadingCallback;
 import com.hotplato.tvbox.crawler.JsLoader;
+import com.hotplato.tvbox.crawler.ProcessExitGuard;
+import com.hotplato.tvbox.crawler.RemoteToastFilter;
 import com.hotplato.tvbox.data.AppDataManager;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.util.HawkConfig;
@@ -35,6 +37,8 @@ public class App extends MultiDexApplication {
         super.onCreate();
         instance = this;
         Init.set(this);
+        ProcessExitGuard.install();
+        RemoteToastFilter.install();
         initParams();
         // OKGo
         OkGoHelper.init();
@@ -61,13 +65,16 @@ public class App extends MultiDexApplication {
         JsLoader.destroy();
     }
 
-    /** 部分爬虫 JAR 会写 /sdcard/TVBox/ 下的配置文件 */
+    /** 部分爬虫 JAR 会写 /sdcard/TVBox、DuoDuo 等目录下的配置文件 */
     private void ensureSpiderWorkDir() {
         try {
-            File dir = new File(Environment.getExternalStorageDirectory(), "TVBox");
-            if (!dir.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                dir.mkdirs();
+            File root = Environment.getExternalStorageDirectory();
+            for (String name : new String[]{"TVBox", "DuoDuo"}) {
+                File dir = new File(root, name);
+                if (!dir.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dir.mkdirs();
+                }
             }
         } catch (Throwable ignored) {
         }
