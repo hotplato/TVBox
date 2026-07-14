@@ -15,17 +15,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import coil.compose.AsyncImage
 import com.hotplato.tvbox.ui.theme.TvFocusBorder
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.theme.TvSurface
-import com.hotplato.tvbox.ui.util.vodImageModel
 
 @Composable
 fun TvPosterCard(
@@ -52,14 +49,13 @@ fun TvPosterCard(
         shape = ClickableSurfaceDefaults.shape(shape = shape),
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            AsyncImage(
-                model = vodImageModel(imageUrl),
+            VodCoverImage(
+                pic = imageUrl,
                 contentDescription = title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.7f)
                     .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
             )
             Text(
                 text = title.take(40),

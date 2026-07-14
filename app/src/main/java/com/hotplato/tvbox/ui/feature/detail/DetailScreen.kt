@@ -21,20 +21,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil.compose.AsyncImage
 import com.hotplato.tvbox.ui.component.ErrorState
 import com.hotplato.tvbox.ui.component.LoadingState
 import com.hotplato.tvbox.ui.component.TvFocusButton
+import com.hotplato.tvbox.ui.component.VodCoverImage
 import com.hotplato.tvbox.ui.play.PlayActivity
 import com.hotplato.tvbox.ui.theme.TvMuted
-import com.hotplato.tvbox.ui.util.vodImageModel
 
 @Composable
 fun DetailScreen(
@@ -71,14 +69,13 @@ fun DetailScreen(
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    AsyncImage(
-                        model = vodImageModel(info.pic),
+                    VodCoverImage(
+                        pic = info.pic,
                         contentDescription = info.name,
                         modifier = Modifier
                             .width(180.dp)
                             .height(260.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        contentScale = ContentScale.Crop,
                     )
                     Column(
                         modifier = Modifier
