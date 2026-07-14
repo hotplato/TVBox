@@ -53,7 +53,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import xyz.doikki.videoplayer.player.VideoView;
+import com.hotplato.tvbox.tvplayer.TvPlayer;
+import com.hotplato.tvbox.tvplayer.TvPlayerView;
 
 /**
  * @author pj567
@@ -61,7 +62,7 @@ import xyz.doikki.videoplayer.player.VideoView;
  * @description:
  */
 public class LivePlayActivityLegacy extends BaseActivity {
-    private VideoView mVideoView;
+    private TvPlayerView mVideoView;
     private TextView tvChannelInfo;
     private TextView tvTime;
     private TextView tvNetSpeed;
@@ -309,7 +310,11 @@ public class LivePlayActivityLegacy extends BaseActivity {
             Hawk.put(HawkConfig.LIVE_CHANNEL, currentLiveChannelItem.getChannelName());
             livePlayerManager.getLiveChannelPlayer(mVideoView, currentLiveChannelItem.getChannelName());
         }
-        mVideoView.setUrl(currentLiveChannelItem.getUrl());
+        String liveUrl = currentLiveChannelItem.getUrl();
+        if (liveUrl == null || liveUrl.trim().isEmpty()) {
+            return false;
+        }
+        mVideoView.setUrl(liveUrl);
         showChannelInfo();
         mVideoView.start();
         return true;
@@ -426,22 +431,22 @@ public class LivePlayActivityLegacy extends BaseActivity {
             @Override
             public void playStateChanged(int playState) {
                 switch (playState) {
-                    case VideoView.STATE_IDLE:
-                    case VideoView.STATE_PAUSED:
+                    case TvPlayer.STATE_IDLE:
+                    case TvPlayer.STATE_PAUSED:
                         break;
-                    case VideoView.STATE_PREPARED:
-                    case VideoView.STATE_BUFFERED:
-                    case VideoView.STATE_PLAYING:
+                    case TvPlayer.STATE_PREPARED:
+                    case TvPlayer.STATE_BUFFERED:
+                    case TvPlayer.STATE_PLAYING:
                         currentLiveChangeSourceTimes = 0;
                         mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
                         break;
-                    case VideoView.STATE_ERROR:
-                    case VideoView.STATE_PLAYBACK_COMPLETED:
+                    case TvPlayer.STATE_ERROR:
+                    case TvPlayer.STATE_PLAYBACK_COMPLETED:
                         mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
                         mHandler.post(mConnectTimeoutChangeSourceRun);
                         break;
-                    case VideoView.STATE_PREPARING:
-                    case VideoView.STATE_BUFFERING:
+                    case TvPlayer.STATE_PREPARING:
+                    case TvPlayer.STATE_BUFFERING:
                         mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
                         mHandler.postDelayed(mConnectTimeoutChangeSourceRun, (Hawk.get(HawkConfig.LIVE_CONNECT_TIMEOUT, 1) + 1) * 5000);
                         break;
@@ -731,8 +736,11 @@ public class LivePlayActivityLegacy extends BaseActivity {
             case 2://播放解码
                 mVideoView.release();
                 livePlayerManager.changeLivePlayerType(mVideoView, position, currentLiveChannelItem.getChannelName());
-                mVideoView.setUrl(currentLiveChannelItem.getUrl());
-                mVideoView.start();
+                String decoderUrl = currentLiveChannelItem.getUrl();
+                if (decoderUrl != null && !decoderUrl.trim().isEmpty()) {
+                    mVideoView.setUrl(decoderUrl);
+                    mVideoView.start();
+                }
                 break;
             case 3://超时换源
                 Hawk.put(HawkConfig.LIVE_CONNECT_TIMEOUT, position);
@@ -859,7 +867,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
         ArrayList<ArrayList<String>> itemsArrayList = new ArrayList<>();
         ArrayList<String> sourceItems = new ArrayList<>();
         ArrayList<String> scaleItems = new ArrayList<>(Arrays.asList("默认", "16:9", "4:3", "填充", "原始", "裁剪"));
-        ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("系统", "ijk硬解", "ijk软解", "exo"));
+        ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("系统", "Media3"));
         ArrayList<String> timeoutItems = new ArrayList<>(Arrays.asList("5s", "10s", "15s", "20s", "25s", "30s"));
         ArrayList<String> personalSettingItems = new ArrayList<>(Arrays.asList("显示时间", "显示网速", "换台反转", "跨选分类"));
         itemsArrayList.add(sourceItems);

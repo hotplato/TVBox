@@ -21,11 +21,11 @@ import androidx.annotation.Nullable;
 
 import java.util.Map;
 
-import xyz.doikki.videoplayer.controller.BaseVideoController;
-import xyz.doikki.videoplayer.controller.IControlComponent;
-import xyz.doikki.videoplayer.controller.IGestureComponent;
-import xyz.doikki.videoplayer.player.VideoView;
-import xyz.doikki.videoplayer.util.PlayerUtils;
+import com.hotplato.tvbox.tvplayer.controller.BaseVideoController;
+import com.hotplato.tvbox.tvplayer.controller.IControlComponent;
+import com.hotplato.tvbox.tvplayer.controller.IGestureComponent;
+import com.hotplato.tvbox.tvplayer.TvPlayer;
+import com.hotplato.tvbox.tvplayer.util.PlayerUtils;
 
 public abstract class BaseController extends BaseVideoController implements GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener, View.OnTouchListener {
     private GestureDetector mGestureDetector;
@@ -117,27 +117,27 @@ public abstract class BaseController extends BaseVideoController implements Gest
     protected void onPlayStateChanged(int playState) {
         super.onPlayStateChanged(playState);
         switch (playState) {
-            case VideoView.STATE_IDLE:
+            case TvPlayer.STATE_IDLE:
                 mLoading.setVisibility(GONE);
                 break;
-            case VideoView.STATE_PLAYING:
+            case TvPlayer.STATE_PLAYING:
                 mPauseRoot.setVisibility(GONE);
                 mLoading.setVisibility(GONE);
                 break;
-            case VideoView.STATE_PAUSED:
+            case TvPlayer.STATE_PAUSED:
                 mPauseRoot.setVisibility(VISIBLE);
                 mLoading.setVisibility(GONE);
                 break;
-            case VideoView.STATE_PREPARED:
-            case VideoView.STATE_ERROR:
-            case VideoView.STATE_BUFFERED:
+            case TvPlayer.STATE_PREPARED:
+            case TvPlayer.STATE_ERROR:
+            case TvPlayer.STATE_BUFFERED:
                 mLoading.setVisibility(GONE);
                 break;
-            case VideoView.STATE_PREPARING:
-            case VideoView.STATE_BUFFERING:
+            case TvPlayer.STATE_PREPARING:
+            case TvPlayer.STATE_BUFFERING:
                 mLoading.setVisibility(VISIBLE);
                 break;
-            case VideoView.STATE_PLAYBACK_COMPLETED:
+            case TvPlayer.STATE_PLAYBACK_COMPLETED:
                 mLoading.setVisibility(GONE);
                 mPauseRoot.setVisibility(GONE);
                 break;
@@ -175,9 +175,9 @@ public abstract class BaseController extends BaseVideoController implements Gest
     @Override
     public void setPlayerState(int playerState) {
         super.setPlayerState(playerState);
-        if (playerState == VideoView.PLAYER_NORMAL) {
+        if (playerState == TvPlayer.PLAYER_NORMAL) {
             mCanSlide = mEnableInNormal;
-        } else if (playerState == VideoView.PLAYER_FULL_SCREEN) {
+        } else if (playerState == TvPlayer.PLAYER_FULL_SCREEN) {
             mCanSlide = true;
         }
     }
@@ -190,12 +190,12 @@ public abstract class BaseController extends BaseVideoController implements Gest
 
     protected boolean isInPlaybackState() {
         return mControlWrapper != null
-                && mCurPlayState != VideoView.STATE_ERROR
-                && mCurPlayState != VideoView.STATE_IDLE
-                && mCurPlayState != VideoView.STATE_PREPARING
-                && mCurPlayState != VideoView.STATE_PREPARED
-                && mCurPlayState != VideoView.STATE_START_ABORT
-                && mCurPlayState != VideoView.STATE_PLAYBACK_COMPLETED;
+                && mCurPlayState != TvPlayer.STATE_ERROR
+                && mCurPlayState != TvPlayer.STATE_IDLE
+                && mCurPlayState != TvPlayer.STATE_PREPARING
+                && mCurPlayState != TvPlayer.STATE_PREPARED
+                && mCurPlayState != TvPlayer.STATE_START_ABORT
+                && mCurPlayState != TvPlayer.STATE_PLAYBACK_COMPLETED;
     }
 
     @Override

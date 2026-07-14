@@ -1,9 +1,9 @@
 package com.hotplato.tvbox.bean;
 
 import androidx.annotation.NonNull;
-import androidx.exifinterface.media.ExifInterface;
 
-import com.hotplato.tvbox.api.ApiConfig;
+import com.hotplato.tvbox.tvplayer.TvPlayer;
+import com.hotplato.tvbox.tvplayer.TvPlayerView;
 import com.hotplato.tvbox.util.HawkConfig;
 import com.hotplato.tvbox.util.PlayerHelper;
 import com.orhanobut.hawk.Hawk;
@@ -11,19 +11,14 @@ import com.orhanobut.hawk.Hawk;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Objects;
-
-import xyz.doikki.videoplayer.player.VideoView;
-
 public class LivePlayerManager {
     JSONObject defaultPlayerConfig = new JSONObject();
     JSONObject currentPlayerConfig;
 
-    public void init(VideoView videoView) {
+    public void init(TvPlayerView videoView) {
         try {
-            defaultPlayerConfig.put("pl", Hawk.get(HawkConfig.PLAY_TYPE, 0));
-            defaultPlayerConfig.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, "软解码"));
+            defaultPlayerConfig.put("pl", PlayerHelper.normalizePlayerType(
+                    Hawk.get(HawkConfig.PLAY_TYPE, TvPlayer.TYPE_MEDIA3)));
             defaultPlayerConfig.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
             defaultPlayerConfig.put("sc", Hawk.get(HawkConfig.PLAY_SCALE, 0));
         } catch (JSONException e) {
@@ -32,7 +27,7 @@ public class LivePlayerManager {
         getDefaultLiveChannelPlayer(videoView);
     }
 
-    public void getDefaultLiveChannelPlayer(VideoView videoView) {
+    public void getDefaultLiveChannelPlayer(TvPlayerView videoView) {
         PlayerHelper.updateCfg(videoView, defaultPlayerConfig);
         try {
             currentPlayerConfig = new JSONObject(defaultPlayerConfig.toString());
@@ -41,20 +36,24 @@ public class LivePlayerManager {
         }
     }
 
-    public void getLiveChannelPlayer(VideoView videoView, String channelName) {
+    public void getLiveChannelPlayer(TvPlayerView videoView, String channelName) {
         JSONObject playerConfig = Hawk.get(channelName, null);
         if (playerConfig == null) {
             if (!currentPlayerConfig.toString().equals(defaultPlayerConfig.toString()))
                 getDefaultLiveChannelPlayer(videoView);
             return;
         }
+        try {
+            playerConfig.put("pl", PlayerHelper.normalizePlayerType(playerConfig.getInt("pl")));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
         if (playerConfig.toString().equals(currentPlayerConfig.toString()))
             return;
 
         try {
             if (playerConfig.getInt("pl") == currentPlayerConfig.getInt("pl")
-                    && playerConfig.getInt("pr") == currentPlayerConfig.getInt("pr")
-                    && playerConfig.getString("ijk").equals(currentPlayerConfig.getString("ijk"))) {
+                    && playerConfig.getInt("pr") == currentPlayerConfig.getInt("pr")) {
                 videoView.setScreenScaleType(playerConfig.getInt("sc"));
             } else {
                 PlayerHelper.updateCfg(videoView, playerConfig);
@@ -66,29 +65,15 @@ public class LivePlayerManager {
         currentPlayerConfig = playerConfig;
     }
 
+    /** UI index: 0=系统, 1=Media3 */
     public int getLivePlayerType() {
-        int playerTypeIndex = 0;
         try {
-            int playerType = currentPlayerConfig.getInt("pl");
-            String ijkCodec = currentPlayerConfig.getString("ijk");
-            switch (playerType) {
-                case 0:
-                    playerTypeIndex = 0;
-                    break;
-                case 1:
-                    if (ijkCodec.equals("硬解码"))
-                        playerTypeIndex = 1;
-                    else
-                        playerTypeIndex = 2;
-                    break;
-                case 2:
-                    playerTypeIndex = 3;
-                    break;
-            }
+            int playerType = PlayerHelper.normalizePlayerType(currentPlayerConfig.getInt("pl"));
+            return playerType == TvPlayer.TYPE_SYSTEM ? 0 : 1;
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        return playerTypeIndex;
+        return 1;
     }
 
     public int getLivePlayerScale() {
@@ -100,26 +85,13 @@ public class LivePlayerManager {
         return 0;
     }
 
-    public void changeLivePlayerType(VideoView videoView, int playerType, String channelName) {
+    public void changeLivePlayerType(TvPlayerView videoView, int playerTypeIndex, String channelName) {
         JSONObject playerConfig = currentPlayerConfig;
         try {
-            switch (playerType) {
-                case 0:
-                    playerConfig.put("pl", 0);
-                    playerConfig.put("ijk", "软解码");
-                    break;
-                case 1:
-                    playerConfig.put("pl", 1);
-                    playerConfig.put("ijk", "硬解码");
-                    break;
-                case 2:
-                    playerConfig.put("pl", 1);
-                    playerConfig.put("ijk", "软解码");
-                    break;
-                case 3:
-                    playerConfig.put("pl", 2);
-                    playerConfig.put("ijk", "软解码");
-                    break;
+            if (playerTypeIndex == 0) {
+                playerConfig.put("pl", TvPlayer.TYPE_SYSTEM);
+            } else {
+                playerConfig.put("pl", TvPlayer.TYPE_MEDIA3);
             }
         } catch (JSONException e) {
             e.printStackTrace();
@@ -134,7 +106,7 @@ public class LivePlayerManager {
         currentPlayerConfig = playerConfig;
     }
 
-    public void changeLivePlayerScale(@NonNull VideoView videoView, int playerScale, String channelName){
+    public void changeLivePlayerScale(@NonNull TvPlayerView videoView, int playerScale, String channelName) {
         videoView.setScreenScaleType(playerScale);
 
         JSONObject playerConfig = currentPlayerConfig;

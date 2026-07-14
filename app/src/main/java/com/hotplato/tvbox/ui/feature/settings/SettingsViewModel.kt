@@ -5,10 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.data.SettingsRepository
 import com.hotplato.tvbox.data.SettingsSnapshot
+import com.hotplato.tvbox.tvplayer.TvPlayer
 import com.hotplato.tvbox.util.OkGoHelper
+import com.hotplato.tvbox.util.PlayerHelper
 import okhttp3.HttpUrl
-import tv.danmaku.ijk.media.player.IjkMediaPlayer
-import xyz.doikki.videoplayer.player.VideoView
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -34,13 +34,8 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun cyclePlayType() {
-        val next = when (SettingsRepository.settings.value.playType) {
-            0 -> 1
-            1 -> 2
-            2 -> 10
-            10 -> 11
-            else -> 0
-        }
+        val current = PlayerHelper.normalizePlayerType(SettingsRepository.settings.value.playType)
+        val next = if (current == TvPlayer.TYPE_SYSTEM) TvPlayer.TYPE_MEDIA3 else TvPlayer.TYPE_SYSTEM
         SettingsRepository.setPlayType(next)
     }
 
@@ -51,12 +46,12 @@ class SettingsViewModel : ViewModel() {
 
     fun cyclePlayScale() {
         val scales = intArrayOf(
-            VideoView.SCREEN_SCALE_DEFAULT,
-            VideoView.SCREEN_SCALE_16_9,
-            VideoView.SCREEN_SCALE_4_3,
-            VideoView.SCREEN_SCALE_MATCH_PARENT,
-            VideoView.SCREEN_SCALE_ORIGINAL,
-            VideoView.SCREEN_SCALE_CENTER_CROP,
+            TvPlayer.SCREEN_SCALE_DEFAULT,
+            TvPlayer.SCREEN_SCALE_16_9,
+            TvPlayer.SCREEN_SCALE_4_3,
+            TvPlayer.SCREEN_SCALE_MATCH_PARENT,
+            TvPlayer.SCREEN_SCALE_ORIGINAL,
+            TvPlayer.SCREEN_SCALE_CENTER_CROP,
         )
         val current = SettingsRepository.settings.value.playScale
         val idx = scales.indexOf(current).let { if (it < 0) 0 else it }
@@ -69,7 +64,6 @@ class SettingsViewModel : ViewModel() {
         SettingsRepository.setDohUrl(next)
         val url = OkGoHelper.getDohUrl(next)
         OkGoHelper.dnsOverHttps.setUrl(if (url.isEmpty()) null else HttpUrl.parse(url))
-        IjkMediaPlayer.toggleDotPort(next > 0)
     }
 
     fun cycleHomeRec() {

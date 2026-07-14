@@ -15,10 +15,9 @@ import androidx.annotation.NonNull;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.hotplato.tvbox.R;
 import com.hotplato.tvbox.api.ApiConfig;
-import com.hotplato.tvbox.bean.IJKCode;
 import com.hotplato.tvbox.bean.ParseBean;
-import com.hotplato.tvbox.player.thirdparty.MXPlayer;
-import com.hotplato.tvbox.player.thirdparty.ReexPlayer;
+import com.hotplato.tvbox.tvplayer.TvPlayer;
+import com.hotplato.tvbox.tvplayer.util.PlayerUtils;
 import com.hotplato.tvbox.ui.adapter.ParseAdapter;
 import com.hotplato.tvbox.util.HawkConfig;
 import com.hotplato.tvbox.util.PlayerHelper;
@@ -30,12 +29,7 @@ import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.List;
-
-import xyz.doikki.videoplayer.player.VideoView;
-import xyz.doikki.videoplayer.util.PlayerUtils;
-
-import static xyz.doikki.videoplayer.util.PlayerUtils.stringForTime;
+import static com.hotplato.tvbox.tvplayer.util.PlayerUtils.stringForTime;
 
 public class VodController extends BaseController {
     public VodController(@NonNull @NotNull Context context) {
@@ -233,56 +227,19 @@ public class VodController extends BaseController {
             public void onClick(View view) {
                 try {
                     int playerType = mPlayerConfig.getInt("pl");
-                    boolean playerVail = false;
-                    do {
-                        playerType++;
-                        if (playerType <= 2) {
-                            playerVail = true;
-                        } else if (playerType == 10) {
-                            playerVail = mxPlayerExist;
-                        } else if (playerType == 11) {
-                            playerVail = reexPlayerExist;
-                        } else if (playerType > 11) {
-                            playerType = 0;
-                            playerVail = true;
-                        }
-                    } while (!playerVail);
+                    playerType = playerType == TvPlayer.TYPE_SYSTEM
+                            ? TvPlayer.TYPE_MEDIA3
+                            : TvPlayer.TYPE_SYSTEM;
                     mPlayerConfig.put("pl", playerType);
                     updatePlayerCfgView();
                     listener.updatePlayerCfg();
                     listener.replay();
-                    // hideBottom();
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
             }
         });
-        mPlayerIJKBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                try {
-                    String ijk = mPlayerConfig.getString("ijk");
-                    List<IJKCode> codecs = ApiConfig.get().getIjkCodes();
-                    for (int i = 0; i < codecs.size(); i++) {
-                        if (ijk.equals(codecs.get(i).getName())) {
-                            if (i >= codecs.size() - 1)
-                                ijk = codecs.get(0).getName();
-                            else {
-                                ijk = codecs.get(i + 1).getName();
-                            }
-                            break;
-                        }
-                    }
-                    mPlayerConfig.put("ijk", ijk);
-                    updatePlayerCfgView();
-                    listener.updatePlayerCfg();
-                    listener.replay();
-                    hideBottom();
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        mPlayerIJKBtn.setVisibility(GONE);
         mPlayerTimeStartBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -342,24 +299,18 @@ public class VodController extends BaseController {
 
     private JSONObject mPlayerConfig = null;
 
-    private boolean mxPlayerExist = false;
-    private boolean reexPlayerExist = false;
-
     public void setPlayerConfig(JSONObject playerCfg) {
         this.mPlayerConfig = playerCfg;
         updatePlayerCfgView();
-        mxPlayerExist = MXPlayer.getPackageInfo() != null;
-        reexPlayerExist = ReexPlayer.getPackageInfo() != null;
     }
 
     void updatePlayerCfgView() {
         try {
-            int playerType = mPlayerConfig.getInt("pl");
+            int playerType = PlayerHelper.normalizePlayerType(mPlayerConfig.getInt("pl"));
+            mPlayerConfig.put("pl", playerType);
             mPlayerBtn.setText(PlayerHelper.getPlayerName(playerType));
             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
-            mPlayerIJKBtn.setText(mPlayerConfig.getString("ijk"));
-            mPlayerIJKBtn.setVisibility(playerType == 1 ? VISIBLE : GONE);
-            mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
+            mPlayerIJKBtn.setVisibility(GONE);
             mPlayerSpeedBtn.setText("x" + mPlayerConfig.getDouble("sp"));
             mPlayerTimeStartBtn.setText(PlayerUtils.stringForTime(mPlayerConfig.getInt("st") * 1000));
             mPlayerTimeSkipBtn.setText(PlayerUtils.stringForTime(mPlayerConfig.getInt("et") * 1000));
@@ -486,23 +437,23 @@ public class VodController extends BaseController {
     protected void onPlayStateChanged(int playState) {
         super.onPlayStateChanged(playState);
         switch (playState) {
-            case VideoView.STATE_IDLE:
+            case TvPlayer.STATE_IDLE:
                 break;
-            case VideoView.STATE_PLAYING:
+            case TvPlayer.STATE_PLAYING:
                 startProgress();
                 break;
-            case VideoView.STATE_PAUSED:
+            case TvPlayer.STATE_PAUSED:
                 break;
-            case VideoView.STATE_ERROR:
+            case TvPlayer.STATE_ERROR:
                 listener.errReplay();
                 break;
-            case VideoView.STATE_PREPARED:
-            case VideoView.STATE_BUFFERED:
+            case TvPlayer.STATE_PREPARED:
+            case TvPlayer.STATE_BUFFERED:
                 break;
-            case VideoView.STATE_PREPARING:
-            case VideoView.STATE_BUFFERING:
+            case TvPlayer.STATE_PREPARING:
+            case TvPlayer.STATE_BUFFERING:
                 break;
-            case VideoView.STATE_PLAYBACK_COMPLETED:
+            case TvPlayer.STATE_PLAYBACK_COMPLETED:
                 listener.playNext(true);
                 break;
         }

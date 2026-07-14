@@ -4,7 +4,11 @@
 
 ## 进行中 / 待办
 
-（暂无）
+### OkHttp 升级到 4.x
+
+- **背景**：工程强制 `okhttp:3.12.13` + `okio:2.8.0`（OkGo / DoH / Coil `TvImageFetcher` 均依赖），与 Media3 `media3-datasource-okhttp` 及 Coil 默认网络栈不兼容。
+- **范围**：去掉 `force` 升级到 OkHttp 4.x；适配 `OkGoHelper`、DoH、图片加载；评估是否改用 Media3 OkHttp DataSource。
+- **说明**：不并入「Media3 + 去 DK 壳」播放器改造；播放期仍用 Media3 `DefaultHttpDataSource`。
 
 ---
 

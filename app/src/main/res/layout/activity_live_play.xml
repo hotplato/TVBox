@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <xyz.doikki.videoplayer.player.VideoView
+    <com.hotplato.tvbox.tvplayer.TvPlayerView
         android:id="@+id/mVideoView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

@@ -54,7 +54,12 @@ object SettingsRepository {
     }
 
     fun setPlayType(type: Int) {
-        Hawk.put(HawkConfig.PLAY_TYPE, type)
+        val normalized = when (type) {
+            0 -> 0
+            2 -> 2
+            else -> 2
+        }
+        Hawk.put(HawkConfig.PLAY_TYPE, normalized)
         refresh()
     }
 
@@ -103,7 +108,11 @@ object SettingsRepository {
         debugOpen = Hawk.get(HawkConfig.DEBUG_OPEN, false),
         parseWebView = Hawk.get(HawkConfig.PARSE_WEBVIEW, true),
         ijkCodec = Hawk.get(HawkConfig.IJK_CODEC, "") ?: "",
-        playType = Hawk.get(HawkConfig.PLAY_TYPE, 0),
+        playType = when (val t = Hawk.get(HawkConfig.PLAY_TYPE, 2)) {
+            0 -> 0
+            2 -> 2
+            else -> 2
+        },
         playRender = Hawk.get(HawkConfig.PLAY_RENDER, 0),
         playScale = Hawk.get(HawkConfig.PLAY_SCALE, 0),
         dohUrl = Hawk.get(HawkConfig.DOH_URL, 0),

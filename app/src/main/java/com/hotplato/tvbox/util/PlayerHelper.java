@@ -1,187 +1,86 @@
 package com.hotplato.tvbox.util;
 
-import android.content.Context;
-
-import com.hotplato.tvbox.api.ApiConfig;
-import com.hotplato.tvbox.bean.IJKCode;
-import com.hotplato.tvbox.player.IjkMediaPlayer;
-import com.hotplato.tvbox.player.render.SurfaceRenderViewFactory;
+import com.hotplato.tvbox.tvplayer.TvPlayer;
+import com.hotplato.tvbox.tvplayer.TvPlayerView;
 import com.orhanobut.hawk.Hawk;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import tv.danmaku.ijk.media.player.IjkLibLoader;
-import xyz.doikki.videoplayer.exo.ExoMediaPlayerFactory;
-import xyz.doikki.videoplayer.player.AndroidMediaPlayerFactory;
-import xyz.doikki.videoplayer.player.PlayerFactory;
-import xyz.doikki.videoplayer.player.VideoView;
-import xyz.doikki.videoplayer.render.RenderViewFactory;
-import xyz.doikki.videoplayer.render.TextureRenderViewFactory;
-
 public class PlayerHelper {
-    public static void updateCfg(VideoView videoView, JSONObject playerCfg) {
-        int playerType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
+
+    /** Normalize legacy play_type values (IJK/MX/Reex) to Media3. */
+    public static void migratePlayType() {
+        int type = Hawk.get(HawkConfig.PLAY_TYPE, TvPlayer.TYPE_MEDIA3);
+        if (type != TvPlayer.TYPE_SYSTEM && type != TvPlayer.TYPE_MEDIA3) {
+            Hawk.put(HawkConfig.PLAY_TYPE, TvPlayer.TYPE_MEDIA3);
+        }
+    }
+
+    public static int normalizePlayerType(int playerType) {
+        if (playerType == TvPlayer.TYPE_SYSTEM || playerType == TvPlayer.TYPE_MEDIA3) {
+            return playerType;
+        }
+        return TvPlayer.TYPE_MEDIA3;
+    }
+
+    public static void updateCfg(TvPlayerView videoView, JSONObject playerCfg) {
+        int playerType = Hawk.get(HawkConfig.PLAY_TYPE, TvPlayer.TYPE_MEDIA3);
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
-        String ijkCode = Hawk.get(HawkConfig.IJK_CODEC, "软解码");
         int scale = Hawk.get(HawkConfig.PLAY_SCALE, 0);
         try {
             playerType = playerCfg.getInt("pl");
             renderType = playerCfg.getInt("pr");
-            ijkCode = playerCfg.getString("ijk");
             scale = playerCfg.getInt("sc");
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        IJKCode codec = ApiConfig.get().getIJKCodec(ijkCode);
-        PlayerFactory playerFactory;
-        if (playerType == 1) {
-            playerFactory = new PlayerFactory<IjkMediaPlayer>() {
-                @Override
-                public IjkMediaPlayer createPlayer(Context context) {
-                    return new IjkMediaPlayer(context, codec);
-                }
-            };
-            try {
-                tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                    @Override
-                    public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                        try {
-                            System.loadLibrary(s);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
-                });
-            } catch (Throwable th) {
-                th.printStackTrace();
-            }
-        } else if (playerType == 2) {
-            playerFactory = ExoMediaPlayerFactory.create();
-        } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
-        }
-        RenderViewFactory renderViewFactory = null;
-        switch (renderType) {
-            case 0:
-            default:
-                renderViewFactory = TextureRenderViewFactory.create();
-                break;
-            case 1:
-                renderViewFactory = SurfaceRenderViewFactory.create();
-                break;
-        }
-        videoView.setPlayerFactory(playerFactory);
-        videoView.setRenderViewFactory(renderViewFactory);
+        playerType = normalizePlayerType(playerType);
+        videoView.setBackendType(playerType);
+        videoView.setRenderType(renderType);
         videoView.setScreenScaleType(scale);
     }
 
-    public static void updateCfg(VideoView videoView) {
-        int playType = Hawk.get(HawkConfig.PLAY_TYPE, 0);
-        PlayerFactory playerFactory;
-        if (playType == 1) {
-            playerFactory = new PlayerFactory<IjkMediaPlayer>() {
-                @Override
-                public IjkMediaPlayer createPlayer(Context context) {
-                    return new IjkMediaPlayer(context, null);
-                }
-            };
-            try {
-                tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                    @Override
-                    public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                        try {
-                            System.loadLibrary(s);
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                    }
-                });
-            } catch (Throwable th) {
-                th.printStackTrace();
-            }
-        } else if (playType == 2) {
-            playerFactory = ExoMediaPlayerFactory.create();
-        } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
-        }
-        int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
-        RenderViewFactory renderViewFactory = null;
-        switch (renderType) {
-            case 0:
-            default:
-                renderViewFactory = TextureRenderViewFactory.create();
-                break;
-            case 1:
-                renderViewFactory = SurfaceRenderViewFactory.create();
-                break;
-        }
-        videoView.setPlayerFactory(playerFactory);
-        videoView.setRenderViewFactory(renderViewFactory);
+    public static void updateCfg(TvPlayerView videoView) {
+        int playType = normalizePlayerType(Hawk.get(HawkConfig.PLAY_TYPE, TvPlayer.TYPE_MEDIA3));
+        videoView.setBackendType(playType);
+        videoView.setRenderType(Hawk.get(HawkConfig.PLAY_RENDER, 0));
+        videoView.setScreenScaleType(Hawk.get(HawkConfig.PLAY_SCALE, 0));
     }
 
-
     public static void init() {
-        try {
-            tv.danmaku.ijk.media.player.IjkMediaPlayer.loadLibrariesOnce(new IjkLibLoader() {
-                @Override
-                public void loadLibrary(String s) throws UnsatisfiedLinkError, SecurityException {
-                    try {
-                        System.loadLibrary(s);
-                    } catch (Throwable th) {
-                        th.printStackTrace();
-                    }
-                }
-            });
-        } catch (Throwable th) {
-            th.printStackTrace();
-        }
+        migratePlayType();
     }
 
     public static String getPlayerName(int playType) {
-        if (playType == 1) {
-            return "IJK播放器";
-        } else if (playType == 2) {
-            return "Exo播放器";
-        } else if (playType == 10) {
-            return "MXPlayer";
-        } else if (playType == 11) {
-            return "Reex";
-        } else {
-            return "系统播放器";
+        if (normalizePlayerType(playType) == TvPlayer.TYPE_MEDIA3) {
+            return "Media3";
         }
+        return "系统播放器";
     }
 
     public static String getRenderName(int renderType) {
         if (renderType == 1) {
             return "SurfaceView";
-        } else {
-            return "TextureView";
         }
+        return "TextureView";
     }
 
     public static String getScaleName(int screenScaleType) {
-        String scaleText = "默认";
         switch (screenScaleType) {
-            case VideoView.SCREEN_SCALE_DEFAULT:
-                scaleText = "默认";
-                break;
-            case VideoView.SCREEN_SCALE_16_9:
-                scaleText = "16:9";
-                break;
-            case VideoView.SCREEN_SCALE_4_3:
-                scaleText = "4:3";
-                break;
-            case VideoView.SCREEN_SCALE_MATCH_PARENT:
-                scaleText = "填充";
-                break;
-            case VideoView.SCREEN_SCALE_ORIGINAL:
-                scaleText = "原始";
-                break;
-            case VideoView.SCREEN_SCALE_CENTER_CROP:
-                scaleText = "裁剪";
-                break;
+            case TvPlayer.SCREEN_SCALE_16_9:
+                return "16:9";
+            case TvPlayer.SCREEN_SCALE_4_3:
+                return "4:3";
+            case TvPlayer.SCREEN_SCALE_MATCH_PARENT:
+                return "填充";
+            case TvPlayer.SCREEN_SCALE_ORIGINAL:
+                return "原始";
+            case TvPlayer.SCREEN_SCALE_CENTER_CROP:
+                return "裁剪";
+            case TvPlayer.SCREEN_SCALE_DEFAULT:
+            default:
+                return "默认";
         }
-        return scaleText;
     }
 }

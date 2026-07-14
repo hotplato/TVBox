@@ -25,38 +25,9 @@ import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.dnsoverhttps.DnsOverHttps;
 import okhttp3.internal.Version;
-import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
 
 public class OkGoHelper {
     public static final long DEFAULT_MILLISECONDS = 10000;      //默认的超时时间
-
-    static void initExoOkHttpClient() {
-        OkHttpClient.Builder builder = new OkHttpClient.Builder();
-        HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkExoPlayer");
-
-        if (Hawk.get(HawkConfig.DEBUG_OPEN, false)) {
-            loggingInterceptor.setPrintLevel(HttpLoggingInterceptor.Level.BODY);
-            loggingInterceptor.setColorLevel(Level.INFO);
-        } else {
-            loggingInterceptor.setPrintLevel(HttpLoggingInterceptor.Level.NONE);
-            loggingInterceptor.setColorLevel(Level.OFF);
-        }
-        builder.addInterceptor(loggingInterceptor);
-
-        builder.retryOnConnectionFailure(true);
-        builder.followRedirects(true);
-        builder.followSslRedirects(true);
-
-
-        try {
-            setOkHttpSsl(builder);
-        } catch (Throwable th) {
-            th.printStackTrace();
-        }
-        builder.dns(dnsOverHttps);
-
-        ExoMediaSourceHelper.getInstance(App.getInstance()).setOkClient(builder.build());
-    }
 
     public static DnsOverHttps dnsOverHttps = null;
 
@@ -138,7 +109,6 @@ public class OkGoHelper {
         OkHttpClient okHttpClient = builder.build();
         OkGo.getInstance().setOkHttpClient(okHttpClient);
 
-        initExoOkHttpClient();
         initPicasso(okHttpClient);
         initCoil(okHttpClient);
     }

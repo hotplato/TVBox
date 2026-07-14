@@ -44,8 +44,8 @@ import com.hotplato.tvbox.bean.VodInfo;
 import com.hotplato.tvbox.cache.CacheManager;
 import com.hotplato.tvbox.event.RefreshEvent;
 import com.hotplato.tvbox.player.controller.VodController;
-import com.hotplato.tvbox.player.thirdparty.MXPlayer;
-import com.hotplato.tvbox.player.thirdparty.ReexPlayer;
+import com.hotplato.tvbox.tvplayer.ProgressStore;
+import com.hotplato.tvbox.tvplayer.TvPlayerView;
 import com.hotplato.tvbox.util.AdBlocker;
 import com.hotplato.tvbox.util.DefaultConfig;
 import com.hotplato.tvbox.util.HawkConfig;
@@ -81,11 +81,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import me.jessyan.autosize.AutoSize;
-import xyz.doikki.videoplayer.player.ProgressManager;
-import xyz.doikki.videoplayer.player.VideoView;
 
 public class PlayActivityLegacy extends BaseActivity {
-    private VideoView mVideoView;
+    private TvPlayerView mVideoView;
     private TextView mPlayLoadTip;
     private ImageView mPlayLoadErr;
     private ProgressBar mPlayLoading;
@@ -126,7 +124,7 @@ public class PlayActivityLegacy extends BaseActivity {
         mController.setCanChangePosition(true);
         mController.setEnableInNormal(true);
         mController.setGestureEnabled(true);
-        ProgressManager progressManager = new ProgressManager() {
+        ProgressStore progressStore = new ProgressStore() {
             @Override
             public void saveProgress(String url, long progress) {
                 CacheManager.save(MD5.string2MD5(url), progress);
@@ -149,8 +147,15 @@ public class PlayActivityLegacy extends BaseActivity {
                     return skip;
                 return rec;
             }
+
+            @Override
+            public void clearProgress(String url) {
+                if (url != null) {
+                    CacheManager.delete(MD5.string2MD5(url), 0);
+                }
+            }
         };
-        mVideoView.setProgressManager(progressManager);
+        mVideoView.setProgressStore(progressStore);
         mController.setListener(new VodController.VodControlListener() {
             @Override
             public void playNext(boolean rmProgress) {
@@ -227,41 +232,29 @@ public class PlayActivityLegacy extends BaseActivity {
                 stopParse();
                 if (mVideoView != null) {
                     mVideoView.release();
-                    if (url != null) {
-                        try {
-                            int playerType = mVodPlayerCfg.getInt("pl");
-                            if (playerType >= 10) {
-                                VodInfo.VodSeries vs = mVodInfo.seriesMap.get(mVodInfo.playFlag).get(mVodInfo.playIndex);
-                                String playTitle = mVodInfo.name + " " + vs.name;
-                                setTip("调用外部播放器" + PlayerHelper.getPlayerName(playerType) + "进行播放", true, false);
-                                boolean callResult = false;
-                                switch (playerType) {
-                                    case 10: {
-                                        callResult = MXPlayer.run(PlayActivityLegacy.this, url, playTitle, playSubtitle, headers);
-                                        break;
-                                    }
-                                    case 11: {
-                                        callResult = ReexPlayer.run(PlayActivityLegacy.this, url, playTitle, playSubtitle, headers);
-                                        break;
-                                    }
-                                }
-                                setTip("调用外部播放器" + PlayerHelper.getPlayerName(playerType) + (callResult ? "成功" : "失败"), callResult, !callResult);
-                                return;
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                        hideTip();
-                        PlayerHelper.updateCfg(mVideoView, mVodPlayerCfg);
-                        mVideoView.setProgressKey(progressKey);
-                        if (headers != null) {
-                            mVideoView.setUrl(url, headers);
-                        } else {
-                            mVideoView.setUrl(url);
-                        }
-                        mVideoView.start();
-                        mController.resetSpeed();
+                    // null = 停播（play() 开局会调一次），不是错误
+                    if (url == null) {
+                        return;
                     }
+                    if (url.trim().isEmpty()) {
+                        LOG.e("playUrl empty from upstream (spider/parse returned blank url)");
+                        setTip("片源未返回播放地址", false, true);
+                        return;
+                    }
+                    LOG.i("playUrl len=" + url.length() + " preview="
+                            + url.substring(0, Math.min(120, url.length())));
+                    try {
+                        int playerType = PlayerHelper.normalizePlayerType(mVodPlayerCfg.getInt("pl"));
+                        mVodPlayerCfg.put("pl", playerType);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    hideTip();
+                    PlayerHelper.updateCfg(mVideoView, mVodPlayerCfg);
+                    mVideoView.setProgressKey(progressKey);
+                    mVideoView.setUrl(url, headers);
+                    mVideoView.start();
+                    mController.resetSpeed();
                 }
             }
         });
@@ -297,6 +290,10 @@ public class PlayActivityLegacy extends BaseActivity {
 
                             }
                         }
+                        LOG.i("playResult parse=" + parse + " jx=" + jx
+                                + " playUrlLen=" + playUrl.length()
+                                + " urlLen=" + (url == null ? -1 : url.length())
+                                + " flag=" + flag);
                         if (parse || jx) {
                             boolean userJxList = (playUrl.isEmpty() && ApiConfig.get().getVipParseFlags().contains(flag)) || jx;
                             initParse(flag, userJxList, playUrl, url);
@@ -334,13 +331,12 @@ public class PlayActivityLegacy extends BaseActivity {
         }
         try {
             if (!mVodPlayerCfg.has("pl")) {
-                mVodPlayerCfg.put("pl", Hawk.get(HawkConfig.PLAY_TYPE, 1));
+                mVodPlayerCfg.put("pl", Hawk.get(HawkConfig.PLAY_TYPE, 2));
+            } else {
+                mVodPlayerCfg.put("pl", PlayerHelper.normalizePlayerType(mVodPlayerCfg.getInt("pl")));
             }
             if (!mVodPlayerCfg.has("pr")) {
                 mVodPlayerCfg.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
-            }
-            if (!mVodPlayerCfg.has("ijk")) {
-                mVodPlayerCfg.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, ""));
             }
             if (!mVodPlayerCfg.has("sc")) {
                 mVodPlayerCfg.put("sc", Hawk.get(HawkConfig.PLAY_SCALE, 0));

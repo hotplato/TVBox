@@ -21,7 +21,7 @@ TVBox 是一款面向 Android TV / 机顶盒的影视聚合客户端（横屏 `l
 ```
 TVBox/
 ├── app/          # 主应用：UI、配置、爬虫加载、本地服务、缓存
-└── player/       # 播放器库：IJK / ExoPlayer / DKPlayer 封装
+└── player/       # 播放器库：Media3 / 系统 MediaPlayer（TvPlayerView）
 ```
 
 ### `app` 核心包
@@ -34,7 +34,7 @@ TVBox/
 | `com.hotplato.tvbox.ui` | Compose UI：`MainActivity`、`theme`、`feature/*`、`navigation` |
 | `com.hotplato.tvbox.ui.play` / `ui.live` | 播放 Compose 外壳 + Legacy View 树（`AndroidView`/叠加） |
 | `com.hotplato.tvbox.data` | Kotlin Repository / `SettingsRepository` / `EventBusBridge` |
-| `com.hotplato.tvbox.player` | 播放控制器、渲染、第三方播放器 |
+| `com.hotplato.tvbox.player` | 点播/直播叠加控制器（绑定 `TvPlayerView`） |
 | `com.hotplato.tvbox.server` | `ControlManager`、`RemoteServer`：局域网 Web 控制 |
 | `com.hotplato.tvbox.cache` | Room 数据库与 DAO |
 | `com.hotplato.tvbox.bean` | 数据模型（`SourceBean`、`VodInfo` 等） |
@@ -61,15 +61,15 @@ TVBox/
 ./gradlew clean
 ```
 
-**环境要求**：Android SDK（`compileSdk 35`）、JDK 17、Android NDK（编译 IJK 原生库时）。`local.properties` 需配置 `sdk.dir`，该文件已 gitignore，勿提交。
+**环境要求**：Android SDK（`compileSdk 35`）、JDK 17。`local.properties` 需配置 `sdk.dir`，该文件已 gitignore，勿提交。
 
 **验证清单**（修改后尽量执行）：
 
 1. `./gradlew assembleDebug` 编译通过
 2. 若改动 UI：确认横屏布局在 1280×720 设计稿下正常（Compose 用 `Dp`；遗留 XML 仍可能走 AutoSize）
 3. 若改动 `ApiConfig` / 爬虫：确认不在主线程调用 `JarLoader.load()` / `SpiderManager` 的 JAR 装载
-4. 若改动播放逻辑：分别验证 IJK（`PLAY_TYPE=1`）与 Exo（`PLAY_TYPE=2`）路径
-5. 若改动 native 库：确认 APK 内包含 `lib/arm64-v8a/libplayer.so` 与 `lib/armeabi-v7a/libplayer.so`
+4. 若改动播放逻辑：分别验证系统播放器（`PLAY_TYPE=0`）与 Media3（`PLAY_TYPE=2`）路径
+5. 若改动迅雷相关：确认 APK 内仍可包含 `lib/armeabi-v7a/libxl_*.so`（无 arm64 迅雷 so）
 
 项目当前**无单元测试**；CI 仅做 release 构建（`.github/workflows/test.yml`，`workflow_dispatch` 触发）。
 
@@ -77,12 +77,9 @@ TVBox/
 
 | 路径 | 说明 |
 |---|---|
-| `player/src/main/jniLibs/armeabi-v7a/` | IJK `libplayer.so`、迅雷 `libxl_*.so`（32 位） |
-| `player/src/main/jniLibs/arm64-v8a/` | IJK `libplayer.so`（64 位） |
+| `player/src/main/jniLibs/armeabi-v7a/` | 迅雷 `libxl_*.so`（32 位） |
 | `app/libs/thunder.jar` | 迅雷 Java SDK |
 | `app/libs/xwalk_shared_library-23.53.589.4.aar` | Crosswalk WebView（原 Maven 仓库已下线，本地引用） |
-
-**IJK 重编译**：从 [bilibili/ijkplayer](https://github.com/bilibili/ijkplayer) 编译 armv7a / arm64，产物重命名为 `libplayer.so` 放入对应 `jniLibs` 目录。
 
 **迅雷 64 位**：`libxl_thunder_sdk.so` / `libxl_stat.so` 暂无 arm64 版；`Thunder.isSupported()` 在 64 位设备上返回 `false`，`thunder://` / magnet 解析自动降级。
 
@@ -130,7 +127,7 @@ TVBox/
 
 ### 播放栈
 
-`player` 模块封装 IJK、ExoPlayer、DKPlayer。`app` 中 `PlayerHelper` 根据 `HawkConfig.PLAY_TYPE` 选择播放器。修改播放相关代码时同时检查 `ui.play.PlayActivity`、`ui.live.LivePlayActivity`（及其 Legacy）、`player/` 模块。
+`player` 模块提供 `TvPlayerView`（薄壳）与 Media3 / 系统 `MediaPlayer` 后端；默认 Media3（`PLAY_TYPE=2`），可选系统播放器（`0`）。`app` 中 `PlayerHelper` 装配后端。修改播放相关代码时同时检查 `ui.play.PlayActivity`、`ui.live.LivePlayActivity`（及其 Legacy）、`com.hotplato.tvbox.tvplayer`、控制器包。
 
 ### 本地服务
 
@@ -224,7 +221,7 @@ feat(app): 支持配置多个首页推荐源
 | AutoSize | 屏幕适配 |
 | XWalk | WebView 解析（本地 AAR） |
 | NanoHTTPD | 本地 HTTP 服务 |
-| ExoPlayer / DKPlayer / IJK | 播放（`player` 模块） |
+| Media3（ExoPlayer） | 播放（`player` 模块 `TvPlayerView`） |
 
 ## 相关文件速查
 

@@ -12,7 +12,6 @@ import com.hotplato.tvbox.R;
 import com.hotplato.tvbox.api.ApiConfig;
 import com.hotplato.tvbox.base.BaseActivity;
 import com.hotplato.tvbox.base.BaseLazyFragment;
-import com.hotplato.tvbox.bean.IJKCode;
 import com.hotplato.tvbox.bean.SourceBean;
 import com.hotplato.tvbox.bean.StoreBean;
 import com.hotplato.tvbox.ui.activity.SettingActivity;
@@ -40,7 +39,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.HttpUrl;
-import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 /**
  * @author pj567
@@ -79,6 +77,10 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvDebugOpen = findViewById(R.id.tvDebugOpen);
         tvParseWebView = findViewById(R.id.tvParseWebView);
         tvMediaCodec = findViewById(R.id.tvMediaCodec);
+        View mediaCodecRow = findViewById(R.id.llMediaCodec);
+        if (mediaCodecRow != null) {
+            mediaCodecRow.setVisibility(View.GONE);
+        }
         tvPlay = findViewById(R.id.tvPlay);
         tvRender = findViewById(R.id.tvRenderType);
         tvScale = findViewById(R.id.tvScaleType);
@@ -88,7 +90,6 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvDns = findViewById(R.id.tvDns);
         tvHomeRec = findViewById(R.id.tvHomeRec);
         tvSearchView = findViewById(R.id.tvSearchView);
-        tvMediaCodec.setText(Hawk.get(HawkConfig.IJK_CODEC, ""));
         tvDebugOpen.setText(Hawk.get(HawkConfig.DEBUG_OPEN, false) ? "已打开" : "已关闭");
         tvParseWebView.setText(Hawk.get(HawkConfig.PARSE_WEBVIEW, true) ? "系统自带" : "XWalkView");
         tvApi.setText(Hawk.get(HawkConfig.API_URL, ""));
@@ -98,7 +99,8 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvSearchView.setText(getSearchView(Hawk.get(HawkConfig.SEARCH_VIEW, 0)));
         tvHomeApi.setText(ApiConfig.get().getHomeSourceBean().getName());
         tvScale.setText(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0)));
-        tvPlay.setText(PlayerHelper.getPlayerName(Hawk.get(HawkConfig.PLAY_TYPE, 0)));
+        tvPlay.setText(PlayerHelper.getPlayerName(
+                PlayerHelper.normalizePlayerType(Hawk.get(HawkConfig.PLAY_TYPE, 2))));
         tvRender.setText(PlayerHelper.getRenderName(Hawk.get(HawkConfig.PLAY_RENDER, 0)));
         findViewById(R.id.llDebug).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -215,7 +217,6 @@ public class ModelSettingFragment extends BaseLazyFragment {
                         Hawk.put(HawkConfig.DOH_URL, pos);
                         String url = OkGoHelper.getDohUrl(pos);
                         OkGoHelper.dnsOverHttps.setUrl(url.isEmpty() ? null : HttpUrl.get(url));
-                        IjkMediaPlayer.toggleDotPort(pos > 0);
                     }
 
                     @Override
@@ -310,50 +311,6 @@ public class ModelSettingFragment extends BaseLazyFragment {
                 dialog.show();
             }
         });
-        findViewById(R.id.llMediaCodec).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                List<IJKCode> ijkCodes = ApiConfig.get().getIjkCodes();
-                if (ijkCodes == null || ijkCodes.size() == 0)
-                    return;
-                FastClickCheckUtil.check(v);
-
-                int defaultPos = 0;
-                String ijkSel = Hawk.get(HawkConfig.IJK_CODEC, "");
-                for (int j = 0; j < ijkCodes.size(); j++) {
-                    if (ijkSel.equals(ijkCodes.get(j).getName())) {
-                        defaultPos = j;
-                        break;
-                    }
-                }
-
-                SelectDialog<IJKCode> dialog = new SelectDialog<>(mActivity);
-                dialog.setTip("请选择IJK解码");
-                dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<IJKCode>() {
-                    @Override
-                    public void click(IJKCode value, int pos) {
-                        value.selected(true);
-                        tvMediaCodec.setText(value.getName());
-                    }
-
-                    @Override
-                    public String getDisplay(IJKCode val) {
-                        return val.getName();
-                    }
-                }, new DiffUtil.ItemCallback<IJKCode>() {
-                    @Override
-                    public boolean areItemsTheSame(@NonNull @NotNull IJKCode oldItem, @NonNull @NotNull IJKCode newItem) {
-                        return oldItem == newItem;
-                    }
-
-                    @Override
-                    public boolean areContentsTheSame(@NonNull @NotNull IJKCode oldItem, @NonNull @NotNull IJKCode newItem) {
-                        return oldItem.getName().equals(newItem.getName());
-                    }
-                }, ijkCodes, defaultPos);
-                dialog.show();
-            }
-        });
         findViewById(R.id.llScale).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -397,11 +354,11 @@ public class ModelSettingFragment extends BaseLazyFragment {
             @Override
             public void onClick(View v) {
                 FastClickCheckUtil.check(v);
-                int defaultPos = Hawk.get(HawkConfig.PLAY_TYPE, 0);
+                int current = PlayerHelper.normalizePlayerType(Hawk.get(HawkConfig.PLAY_TYPE, 2));
                 ArrayList<Integer> players = new ArrayList<>();
                 players.add(0);
-                players.add(1);
                 players.add(2);
+                int defaultPos = current == 0 ? 0 : 1;
                 SelectDialog<Integer> dialog = new SelectDialog<>(mActivity);
                 dialog.setTip("请选择默认播放器");
                 dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<Integer>() {
