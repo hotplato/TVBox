@@ -1,9 +1,13 @@
 package com.hotplato.tvbox.base;
 
+import android.os.Environment;
+
 import androidx.multidex.MultiDexApplication;
 
+import com.github.catvod.Init;
 import com.hotplato.tvbox.callback.EmptyCallback;
 import com.hotplato.tvbox.callback.LoadingCallback;
+import com.hotplato.tvbox.crawler.JsLoader;
 import com.hotplato.tvbox.data.AppDataManager;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.util.HawkConfig;
@@ -11,8 +15,10 @@ import com.hotplato.tvbox.util.OkGoHelper;
 import com.hotplato.tvbox.util.PlayerHelper;
 import com.kingja.loadsir.core.LoadSir;
 import com.orhanobut.hawk.Hawk;
+import com.whl.quickjs.android.QuickJSLoader;
 
-import me.jessyan.autosize.AutoSize;
+import java.io.File;
+
 import me.jessyan.autosize.AutoSizeConfig;
 import me.jessyan.autosize.unit.Subunits;
 
@@ -28,9 +34,11 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        Init.set(this);
         initParams();
         // OKGo
         OkGoHelper.init();
+        QuickJSLoader.init();
         // 初始化Web服务器
         ControlManager.init(this);
         //初始化数据库
@@ -44,6 +52,25 @@ public class App extends MultiDexApplication {
                 .setSupportSP(false)
                 .setSupportSubunits(Subunits.MM);
         PlayerHelper.init();
+        ensureSpiderWorkDir();
+    }
+
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        JsLoader.destroy();
+    }
+
+    /** 部分爬虫 JAR 会写 /sdcard/TVBox/ 下的配置文件 */
+    private void ensureSpiderWorkDir() {
+        try {
+            File dir = new File(Environment.getExternalStorageDirectory(), "TVBox");
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private void initParams() {

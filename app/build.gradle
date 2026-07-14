@@ -82,6 +82,7 @@ dependencies {
     implementation 'com.orhanobut:hawk:2.0.1'
 
     implementation project(":player")
+    implementation project(":quickjs")
 
     implementation files('libs/xwalk_shared_library-23.53.589.4.aar')
     implementation 'com.lzy.net:okgo:3.0.4'
@@ -89,4 +90,6 @@ dependencies {
     implementation 'com.owen:tv-recyclerview:3.0.0'
 
     implementation 'com.github.getActivity:XXPermissions:13.6'
+    implementation 'org.jsoup:jsoup:1.16.1'
+    implementation 'com.google.guava:guava:31.1-android'
 }

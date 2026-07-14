@@ -34,7 +34,7 @@ import androidx.annotation.Nullable;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.hotplato.tvbox.crawler.Spider;
+import com.github.catvod.crawler.Spider;
 import com.hotplato.tvbox.R;
 import com.hotplato.tvbox.api.ApiConfig;
 import com.hotplato.tvbox.base.BaseActivity;

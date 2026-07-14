@@ -12,17 +12,18 @@
 | 原包名 | 新包名 |
 |---|---|
 | `com.github.tvbox.osc` | `com.hotplato.tvbox` |
-| `com.github.catvod.crawler` | `com.hotplato.tvbox.crawler` |
 | `com.github.tvbox.osc.player`（player namespace） | `com.hotplato.tvbox.player` |
 
 第三方包（IJK / DKPlayer / 迅雷等）不改动。
 
 ## 约束
 
-`JarLoader` 中反射加载外部爬虫 JAR 的字符串必须保留：
+以下包名**不可**随 applicationId 重命名（外部爬虫 JAR 硬依赖）：
 
-- `com.github.catvod.spider.*`
-- `com.github.catvod.parser.*`
+- 宿主 API：`com.github.catvod.crawler.Spider` / `SpiderDebug` / `SpiderNull`
+- `JarLoader` 反射加载：`com.github.catvod.spider.*`、`com.github.catvod.parser.*`
+
+`JarLoader` 本身可放在 `com.hotplato.tvbox.crawler`。
 
 ## 副作用
 

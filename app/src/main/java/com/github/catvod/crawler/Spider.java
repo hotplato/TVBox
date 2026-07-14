@@ -1,4 +1,4 @@
-package com.hotplato.tvbox.crawler;
+package com.github.catvod.crawler;
 
 import android.content.Context;
 
@@ -8,9 +8,14 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.Dns;
 
+/**
+ * 动态爬虫 JAR / JS 的宿主 API，包名必须保持 com.github.catvod.crawler，
+ * 与外部 spider JAR 编译依赖一致，不可随 applicationId 重命名。
+ */
 public abstract class Spider {
 
     public static JSONObject empty = new JSONObject();
@@ -75,6 +80,10 @@ public abstract class Spider {
         return "";
     }
 
+    public String searchContent(String key, boolean quick, String pg) {
+        return searchContent(key, quick);
+    }
+
     /**
      * 播放信息
      *
@@ -103,6 +112,16 @@ public abstract class Spider {
      */
     public boolean manualVideoCheck() {
         return false;
+    }
+
+    public Object[] proxyLocal(Map<String, String> params) {
+        return null;
+    }
+
+    public void cancelByTag() {
+    }
+
+    public void destroy() {
     }
 
     public static Dns safeDns() {

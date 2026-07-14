@@ -6,7 +6,7 @@ import android.util.Base64;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import com.hotplato.tvbox.crawler.Spider;
+import com.github.catvod.crawler.Spider;
 import com.hotplato.tvbox.api.ApiConfig;
 import com.hotplato.tvbox.base.App;
 import com.hotplato.tvbox.bean.AbsJson;

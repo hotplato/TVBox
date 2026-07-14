@@ -12,6 +12,7 @@ public class SourceBean {
     private int filterable; // 可筛选?
     private String playerUrl; // 站点解析Url
     private String ext; // 扩展数据
+    private String jar = ""; // 站点级自定义 jsapi jar（可选）
     private ArrayList<String> categories = null; // 分类&排序
 
     public String getKey() {
@@ -84,6 +85,14 @@ public class SourceBean {
 
     public void setExt(String ext) {
         this.ext = ext;
+    }
+
+    public String getJar() {
+        return jar == null ? "" : jar;
+    }
+
+    public void setJar(String jar) {
+        this.jar = jar == null ? "" : jar;
     }
 
     public ArrayList<String> getCategories() {

@@ -5,8 +5,9 @@ import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Base64;
 
+import com.github.catvod.crawler.Spider;
 import com.hotplato.tvbox.crawler.JarLoader;
-import com.hotplato.tvbox.crawler.Spider;
+import com.hotplato.tvbox.crawler.JsLoader;
 import com.hotplato.tvbox.base.App;
 import com.hotplato.tvbox.bean.LiveChannelGroup;
 import com.hotplato.tvbox.bean.IJKCode;
@@ -60,7 +61,7 @@ public class ApiConfig {
     private SourceBean emptyHome = new SourceBean();
 
     private JarLoader jarLoader = new JarLoader();
-
+    private JsLoader jsLoader = new JsLoader();
 
     private ApiConfig() {
         sourceBeanList = new LinkedHashMap<>();
@@ -181,12 +182,17 @@ public class ApiConfig {
                 File cacheDir = cache.getParentFile();
                 if (!cacheDir.exists())
                     cacheDir.mkdirs();
-                if (cache.exists())
+                if (cache.exists()) {
+                    // 可能已被设为只读，先放开写权限再删除以便更新
+                    cache.setWritable(true);
                     cache.delete();
+                }
                 FileOutputStream fos = new FileOutputStream(cache);
                 fos.write(response.body().bytes());
                 fos.flush();
                 fos.close();
+                // Android 14+：写完并关闭后再设只读，供 DexClassLoader 加载
+                cache.setReadOnly();
                 return cache;
             }
 
@@ -225,6 +231,7 @@ public class ApiConfig {
 
     private void parseJson(String apiUrl, String jsonStr) {
         JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+        jsLoader.clear();
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
         // wallpaper
@@ -244,6 +251,7 @@ public class ApiConfig {
             sb.setFilterable(DefaultConfig.safeJsonInt(obj, "filterable", 1));
             sb.setPlayerUrl(DefaultConfig.safeJsonString(obj, "playUrl", ""));
             sb.setExt(DefaultConfig.safeJsonString(obj, "ext", ""));
+            sb.setJar(DefaultConfig.safeJsonString(obj, "jar", ""));
             sb.setCategories(DefaultConfig.safeJsonStringList(obj, "categories"));
             if (firstSite == null)
                 firstSite = sb;
@@ -351,10 +359,17 @@ public class ApiConfig {
         int channelIndex = 0;
         int channelNum = 0;
         for (JsonElement groupElement : livesArray) {
+            if (groupElement == null || !groupElement.isJsonObject())
+                continue;
+            JsonObject groupObj = groupElement.getAsJsonObject();
+            JsonElement groupNameEl = groupObj.get("group");
+            JsonElement channelsEl = groupObj.get("channels");
+            if (groupNameEl == null || groupNameEl.isJsonNull() || channelsEl == null || !channelsEl.isJsonArray())
+                continue;
             LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
             liveChannelGroup.setLiveChannels(new ArrayList<LiveChannelItem>());
             liveChannelGroup.setGroupIndex(groupIndex++);
-            String groupName = ((JsonObject) groupElement).get("group").getAsString().trim();
+            String groupName = groupNameEl.getAsString().trim();
             String[] splitGroupName = groupName.split("_", 2);
             liveChannelGroup.setGroupName(splitGroupName[0]);
             if (splitGroupName.length > 1)
@@ -362,7 +377,7 @@ public class ApiConfig {
             else
                 liveChannelGroup.setGroupPassword("");
             channelIndex = 0;
-            for (JsonElement channelElement : ((JsonObject) groupElement).get("channels").getAsJsonArray()) {
+            for (JsonElement channelElement : channelsEl.getAsJsonArray()) {
                 JsonObject obj = (JsonObject) channelElement;
                 LiveChannelItem liveChannelItem = new LiveChannelItem();
                 liveChannelItem.setChannelName(obj.get("name").getAsString().trim());
@@ -394,10 +409,17 @@ public class ApiConfig {
     }
 
     public Spider getCSP(SourceBean sourceBean) {
-        return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt());
+        String api = sourceBean.getApi();
+        if (api != null && (api.endsWith(".js") || api.contains(".js?"))) {
+            return jsLoader.getSpider(sourceBean.getKey(), api, sourceBean.getExt(), sourceBean.getJar());
+        }
+        return jarLoader.getSpider(sourceBean.getKey(), api, sourceBean.getExt());
     }
 
     public Object[] proxyLocal(Map param) {
+        if (param != null && "js".equals(String.valueOf(param.get("do")))) {
+            return jsLoader.proxyInvoke(param);
+        }
         return jarLoader.proxyInvoke(param);
     }
 

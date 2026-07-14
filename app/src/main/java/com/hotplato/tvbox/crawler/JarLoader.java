@@ -2,6 +2,8 @@ package com.hotplato.tvbox.crawler;
 
 import android.content.Context;
 
+import com.github.catvod.crawler.Spider;
+import com.github.catvod.crawler.SpiderNull;
 import com.hotplato.tvbox.base.App;
 
 import org.json.JSONObject;
@@ -30,10 +32,15 @@ public class JarLoader {
         proxyFun = null;
         boolean success = false;
         try {
+            File jar = new File(cache);
+            // Android 14+：动态加载的 DEX/JAR 必须为只读，否则抛 SecurityException
+            if (jar.exists() && !jar.setReadOnly()) {
+                System.err.println("Failed to set csp.jar read-only: " + jar.getAbsolutePath());
+            }
             File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp");
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
-            classLoader = new DexClassLoader(cache, cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());
+            classLoader = new DexClassLoader(jar.getAbsolutePath(), cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());
             // make force wait here, some device async dex load
             int count = 0;
             do {
@@ -65,12 +72,32 @@ public class JarLoader {
         return success;
     }
 
+    /**
+     * JAR 爬虫 api 形如 csp_Xxx；.js / http(s) URL 属于 drpy/JS 源，需 JsLoader（本仓库未集成）。
+     */
+    static boolean isJarSpiderApi(String api) {
+        if (api == null || api.isEmpty())
+            return false;
+        if (api.contains("://") || api.contains("/") || api.contains("\\"))
+            return false;
+        if (api.endsWith(".js") || api.contains(".js?") || api.contains(".py"))
+            return false;
+        String clsKey = api.startsWith("csp_") ? api.substring(4) : api;
+        return !clsKey.isEmpty() && clsKey.matches("[A-Za-z_][A-Za-z0-9_]*");
+    }
+
     public Spider getSpider(String key, String cls, String ext) {
-        String clsKey = cls.replace("csp_", "");
         if (spiders.containsKey(key))
             return spiders.get(key);
+        if (!isJarSpiderApi(cls)) {
+            // 缓存空实现，避免首页分类循环反复 ClassNotFoundException 刷屏
+            Spider nullSpider = new SpiderNull();
+            spiders.put(key, nullSpider);
+            return nullSpider;
+        }
         if (classLoader == null)
             return new SpiderNull();
+        String clsKey = cls.startsWith("csp_") ? cls.substring(4) : cls;
         try {
             Spider sp = (Spider) classLoader.loadClass("com.github.catvod.spider." + clsKey).newInstance();
             sp.init(App.getInstance(), ext);
@@ -78,8 +105,10 @@ public class JarLoader {
             return sp;
         } catch (Throwable th) {
             th.printStackTrace();
+            Spider nullSpider = new SpiderNull();
+            spiders.put(key, nullSpider);
+            return nullSpider;
         }
-        return new SpiderNull();
     }
 
     public JSONObject jsonExt(String key, LinkedHashMap<String, String> jxs, String url) {

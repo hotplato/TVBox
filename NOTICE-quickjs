@@ -1,0 +1,6 @@
+QuickJS Android wrapper and JS spider bridge code adapted from:
+  https://github.com/takagen99/Box
+License: GNU Affero General Public License v3.0 (AGPL-3.0)
+
+The :quickjs module (com.whl.quickjs) and related JsLoader / util/js bridge
+are derived from that project for compatibility with TVBoxOSC drpy JS sources.
