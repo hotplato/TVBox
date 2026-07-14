@@ -1,13 +1,13 @@
 package com.hotplato.tvbox.util;
 
 import com.hotplato.tvbox.base.App;
+import com.hotplato.tvbox.picasso.MyOkhttpDownLoader;
 import com.hotplato.tvbox.util.SSL.SSLSocketFactoryCompat;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.https.HttpsUtils;
 import com.lzy.okgo.interceptor.HttpLoggingInterceptor;
 import com.lzy.okgo.model.HttpHeaders;
 import com.orhanobut.hawk.Hawk;
-import com.hotplato.tvbox.picasso.MyOkhttpDownLoader;
 import com.squareup.picasso.Picasso;
 
 import java.io.File;
@@ -19,6 +19,7 @@ import java.util.logging.Level;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.X509TrustManager;
 
+import com.hotplato.tvbox.ui.image.CoilSetup;
 import okhttp3.Cache;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -139,12 +140,17 @@ public class OkGoHelper {
 
         initExoOkHttpClient();
         initPicasso(okHttpClient);
+        initCoil(okHttpClient);
     }
 
     static void initPicasso(OkHttpClient client) {
         MyOkhttpDownLoader downloader = new MyOkhttpDownLoader(client);
         Picasso picasso = new Picasso.Builder(App.getInstance()).downloader(downloader).build();
         Picasso.setSingletonInstance(picasso);
+    }
+
+    static void initCoil(OkHttpClient client) {
+        CoilSetup.init(App.getInstance(), client);
     }
 
     private static synchronized void setOkHttpSsl(OkHttpClient.Builder builder) {

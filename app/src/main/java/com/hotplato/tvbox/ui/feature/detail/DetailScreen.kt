@@ -34,6 +34,7 @@ import com.hotplato.tvbox.ui.component.LoadingState
 import com.hotplato.tvbox.ui.component.TvFocusButton
 import com.hotplato.tvbox.ui.play.PlayActivity
 import com.hotplato.tvbox.ui.theme.TvMuted
+import com.hotplato.tvbox.ui.util.vodImageModel
 
 @Composable
 fun DetailScreen(
@@ -71,7 +72,7 @@ fun DetailScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
                     AsyncImage(
-                        model = info.pic,
+                        model = vodImageModel(info.pic),
                         contentDescription = info.name,
                         modifier = Modifier
                             .width(180.dp)

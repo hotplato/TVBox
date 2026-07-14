@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 import com.hotplato.tvbox.ui.theme.TvFocusBorder
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.theme.TvSurface
+import com.hotplato.tvbox.ui.util.vodImageModel
 
 @Composable
 fun TvPosterCard(
@@ -52,7 +53,7 @@ fun TvPosterCard(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             AsyncImage(
-                model = imageUrl,
+                model = vodImageModel(imageUrl),
                 contentDescription = title,
                 modifier = Modifier
                     .fillMaxWidth()
