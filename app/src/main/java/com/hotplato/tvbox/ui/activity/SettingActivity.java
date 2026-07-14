@@ -44,6 +44,7 @@ public class SettingActivity extends BaseActivity {
     private Handler mHandler = new Handler();
     private String homeSourceKey;
     private String currentApi;
+    private String currentStoreApi;
     private int homeRec;
     private int dnsOpt;
 
@@ -107,6 +108,7 @@ public class SettingActivity extends BaseActivity {
 
     private void initData() {
         currentApi = Hawk.get(HawkConfig.API_URL, "");
+        currentStoreApi = Hawk.get(HawkConfig.STORE_API, "");
         homeSourceKey = ApiConfig.get().getHomeSourceBean().getKey();
         homeRec = Hawk.get(HawkConfig.HOME_REC, 0);
         dnsOpt = Hawk.get(HawkConfig.DOH_URL, 0);
@@ -177,12 +179,15 @@ public class SettingActivity extends BaseActivity {
 
     @Override
     public void onBackPressed() {
+        boolean apiChanged = !currentApi.equals(Hawk.get(HawkConfig.API_URL, ""));
+        boolean storeChanged = !currentStoreApi.equals(Hawk.get(HawkConfig.STORE_API, ""));
         if ((homeSourceKey != null && !homeSourceKey.equals(Hawk.get(HawkConfig.HOME_API, ""))) ||
-                !currentApi.equals(Hawk.get(HawkConfig.API_URL, "")) ||
+                apiChanged ||
+                storeChanged ||
                 homeRec != Hawk.get(HawkConfig.HOME_REC, 0) ||
                 dnsOpt != Hawk.get(HawkConfig.DOH_URL, 0)) {
             AppManager.getInstance().finishAllActivity();
-            if (currentApi.equals(Hawk.get(HawkConfig.API_URL, ""))) {
+            if (!apiChanged && !storeChanged) {
                 Bundle bundle = new Bundle();
                 bundle.putBoolean("useCache", true);
                 jumpActivity(HomeActivity.class, bundle);

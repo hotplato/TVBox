@@ -32,6 +32,7 @@ import com.hotplato.tvbox.base.BaseLazyFragment;
 import com.hotplato.tvbox.bean.AbsSortXml;
 import com.hotplato.tvbox.bean.MovieSort;
 import com.hotplato.tvbox.bean.SourceBean;
+import com.hotplato.tvbox.bean.StoreBean;
 import com.hotplato.tvbox.event.RefreshEvent;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.ui.adapter.HomePageAdapter;
@@ -258,6 +259,10 @@ public class HomeActivity extends BaseActivity {
                             }
                         });
                     }
+
+                    @Override
+                    public void needSelect(List<StoreBean> stores) {
+                    }
                 });
             }
             return;
@@ -287,6 +292,16 @@ public class HomeActivity extends BaseActivity {
                         initData();
                     }
                 }, 50);
+            }
+
+            @Override
+            public void needSelect(List<StoreBean> stores) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        showStoreSelectDialog(stores, useCacheConfig);
+                    }
+                });
             }
 
             @Override
@@ -350,6 +365,104 @@ public class HomeActivity extends BaseActivity {
                 });
             }
         }, this);
+    }
+
+    private void showStoreSelectDialog(List<StoreBean> stores, boolean useCache) {
+        if (stores == null || stores.isEmpty()) {
+            Toast.makeText(this, "多仓列表为空", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int defaultPos = 0;
+        String storeApi = Hawk.get(HawkConfig.STORE_API, "");
+        for (int i = 0; i < stores.size(); i++) {
+            if (storeApi.equals(stores.get(i).getUrl())) {
+                defaultPos = i;
+                break;
+            }
+        }
+        SelectDialog<StoreBean> dialog = new SelectDialog<>(this);
+        dialog.setTip("请选择仓库");
+        dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<StoreBean>() {
+            @Override
+            public void click(StoreBean value, int pos) {
+                dialog.dismiss();
+                ApiConfig.get().loadSelectedStore(value, useCache, new ApiConfig.LoadConfigCallback() {
+                    @Override
+                    public void success() {
+                        dataInitOk = true;
+                        if (ApiConfig.get().getSpider().isEmpty()) {
+                            jarInitOk = true;
+                        }
+                        mHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                initData();
+                            }
+                        }, 50);
+                    }
+
+                    @Override
+                    public void retry() {
+                        mHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                initData();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void error(String msg) {
+                        mHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                TipDialog tipDialog = new TipDialog(HomeActivity.this, msg, "重试", "取消", new TipDialog.OnListener() {
+                                    @Override
+                                    public void left() {
+                                        initData();
+                                    }
+
+                                    @Override
+                                    public void right() {
+                                        dataInitOk = true;
+                                        jarInitOk = true;
+                                        initData();
+                                    }
+
+                                    @Override
+                                    public void cancel() {
+                                        dataInitOk = true;
+                                        jarInitOk = true;
+                                        initData();
+                                    }
+                                });
+                                tipDialog.show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void needSelect(List<StoreBean> nextStores) {
+                    }
+                });
+            }
+
+            @Override
+            public String getDisplay(StoreBean val) {
+                return val.getName();
+            }
+        }, new DiffUtil.ItemCallback<StoreBean>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull @NotNull StoreBean oldItem, @NonNull @NotNull StoreBean newItem) {
+                return oldItem == newItem;
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull @NotNull StoreBean oldItem, @NonNull @NotNull StoreBean newItem) {
+                return oldItem.getUrl().equals(newItem.getUrl());
+            }
+        }, stores, defaultPos);
+        dialog.show();
     }
 
     private void initViewPager(AbsSortXml absXml) {

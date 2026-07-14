@@ -14,6 +14,7 @@ import com.hotplato.tvbox.base.BaseActivity;
 import com.hotplato.tvbox.base.BaseLazyFragment;
 import com.hotplato.tvbox.bean.IJKCode;
 import com.hotplato.tvbox.bean.SourceBean;
+import com.hotplato.tvbox.bean.StoreBean;
 import com.hotplato.tvbox.ui.activity.SettingActivity;
 import com.hotplato.tvbox.ui.adapter.SelectDialogAdapter;
 import com.hotplato.tvbox.ui.dialog.AboutDialog;
@@ -54,6 +55,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
     private TextView tvRender;
     private TextView tvScale;
     private TextView tvApi;
+    private TextView tvStore;
     private TextView tvHomeApi;
     private TextView tvDns;
     private TextView tvHomeRec;
@@ -81,6 +83,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvRender = findViewById(R.id.tvRenderType);
         tvScale = findViewById(R.id.tvScaleType);
         tvApi = findViewById(R.id.tvApi);
+        tvStore = findViewById(R.id.tvStore);
         tvHomeApi = findViewById(R.id.tvHomeApi);
         tvDns = findViewById(R.id.tvDns);
         tvHomeRec = findViewById(R.id.tvHomeRec);
@@ -89,6 +92,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvDebugOpen.setText(Hawk.get(HawkConfig.DEBUG_OPEN, false) ? "已打开" : "已关闭");
         tvParseWebView.setText(Hawk.get(HawkConfig.PARSE_WEBVIEW, true) ? "系统自带" : "XWalkView");
         tvApi.setText(Hawk.get(HawkConfig.API_URL, ""));
+        refreshStoreUi();
         tvDns.setText(OkGoHelper.dnsHttpsList.get(Hawk.get(HawkConfig.DOH_URL, 0)));
         tvHomeRec.setText(getHomeRecName(Hawk.get(HawkConfig.HOME_REC, 0)));
         tvSearchView.setText(getSearchView(Hawk.get(HawkConfig.SEARCH_VIEW, 0)));
@@ -241,8 +245,13 @@ public class ModelSettingFragment extends BaseLazyFragment {
                 dialog.setOnListener(new ApiDialog.OnListener() {
                     @Override
                     public void onchange(String api) {
+                        String oldApi = Hawk.get(HawkConfig.API_URL, "");
                         Hawk.put(HawkConfig.API_URL, api);
+                        if (!oldApi.equals(api)) {
+                            ApiConfig.clearStoreSelection();
+                        }
                         tvApi.setText(api);
+                        refreshStoreUi();
                     }
                 });
                 dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -252,6 +261,52 @@ public class ModelSettingFragment extends BaseLazyFragment {
                         EventBus.getDefault().unregister(dialog);
                     }
                 });
+                dialog.show();
+            }
+        });
+        findViewById(R.id.llStore).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FastClickCheckUtil.check(v);
+                List<StoreBean> stores = ApiConfig.get().getStoreBeanList();
+                if (stores == null || stores.isEmpty()) {
+                    Toast.makeText(mContext, "当前不是多仓配置", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int defaultPos = 0;
+                String storeApi = Hawk.get(HawkConfig.STORE_API, "");
+                for (int i = 0; i < stores.size(); i++) {
+                    if (storeApi.equals(stores.get(i).getUrl())) {
+                        defaultPos = i;
+                        break;
+                    }
+                }
+                SelectDialog<StoreBean> dialog = new SelectDialog<>(mActivity);
+                dialog.setTip("请选择仓库");
+                dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<StoreBean>() {
+                    @Override
+                    public void click(StoreBean value, int pos) {
+                        Hawk.put(HawkConfig.STORE_API, value.getUrl());
+                        Hawk.put(HawkConfig.STORE_NAME, value.getName() != null ? value.getName() : "");
+                        refreshStoreUi();
+                        dialog.dismiss();
+                    }
+
+                    @Override
+                    public String getDisplay(StoreBean val) {
+                        return val.getName();
+                    }
+                }, new DiffUtil.ItemCallback<StoreBean>() {
+                    @Override
+                    public boolean areItemsTheSame(@NonNull @NotNull StoreBean oldItem, @NonNull @NotNull StoreBean newItem) {
+                        return oldItem == newItem;
+                    }
+
+                    @Override
+                    public boolean areContentsTheSame(@NonNull @NotNull StoreBean oldItem, @NonNull @NotNull StoreBean newItem) {
+                        return oldItem.getUrl().equals(newItem.getUrl());
+                    }
+                }, stores, defaultPos);
                 dialog.show();
             }
         });
@@ -494,6 +549,17 @@ public class ModelSettingFragment extends BaseLazyFragment {
     public void onDestroyView() {
         super.onDestroyView();
         SettingActivity.callback = null;
+    }
+
+    private void refreshStoreUi() {
+        if (tvStore == null)
+            return;
+        if (ApiConfig.get().isMultiStore()) {
+            String name = Hawk.get(HawkConfig.STORE_NAME, "");
+            tvStore.setText(name.isEmpty() ? "未选择" : name);
+        } else {
+            tvStore.setText("无");
+        }
     }
 
     String getHomeRecName(int type) {

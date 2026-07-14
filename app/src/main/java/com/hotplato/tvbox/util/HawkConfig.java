@@ -8,6 +8,8 @@ package com.hotplato.tvbox.util;
 public class HawkConfig {
     public static final String API_URL = "api_url";
     public static final String API_HISTORY = "api_history";
+    public static final String STORE_API = "store_api";
+    public static final String STORE_NAME = "store_name";
     public static final String HOME_API = "home_api";
     public static final String DEFAULT_PARSE = "parse_default";
     public static final String DEBUG_OPEN = "debug_open";

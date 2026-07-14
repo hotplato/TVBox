@@ -14,6 +14,7 @@ import com.hotplato.tvbox.bean.IJKCode;
 import com.hotplato.tvbox.bean.LiveChannelItem;
 import com.hotplato.tvbox.bean.ParseBean;
 import com.hotplato.tvbox.bean.SourceBean;
+import com.hotplato.tvbox.bean.StoreBean;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.util.AdBlocker;
 import com.hotplato.tvbox.util.DefaultConfig;
@@ -62,6 +63,7 @@ public class ApiConfig {
 
     private JarLoader jarLoader = new JarLoader();
     private JsLoader jsLoader = new JsLoader();
+    private List<StoreBean> storeBeanList = new ArrayList<>();
 
     private ApiConfig() {
         sourceBeanList = new LinkedHashMap<>();
@@ -86,30 +88,158 @@ public class ApiConfig {
             callback.error("-1");
             return;
         }
-        File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
+        fetchJson(apiUrl, useCache, new FetchCallback() {
+            @Override
+            public void onSuccess(String json) {
+                try {
+                    handleRootConfig(apiUrl, json, useCache, callback);
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                    callback.error("解析配置失败");
+                }
+            }
+
+            @Override
+            public void onError(String msg) {
+                callback.error(msg);
+            }
+        });
+    }
+
+    /**
+     * 用户选中仓库后加载对应单仓配置。
+     */
+    public void loadSelectedStore(StoreBean store, boolean useCache, LoadConfigCallback callback) {
+        if (store == null || TextUtils.isEmpty(store.getUrl())) {
+            callback.error("多仓列表为空");
+            return;
+        }
+        Hawk.put(HawkConfig.STORE_API, store.getUrl());
+        Hawk.put(HawkConfig.STORE_NAME, store.getName() != null ? store.getName() : "");
+        loadChildConfig(store.getUrl(), useCache, callback);
+    }
+
+    public static void clearStoreSelection() {
+        Hawk.put(HawkConfig.STORE_API, "");
+        Hawk.put(HawkConfig.STORE_NAME, "");
+    }
+
+    public List<StoreBean> getStoreBeanList() {
+        return new ArrayList<>(storeBeanList);
+    }
+
+    public boolean isMultiStore() {
+        return storeBeanList != null && !storeBeanList.isEmpty();
+    }
+
+    private void handleRootConfig(String apiUrl, String json, boolean useCache, LoadConfigCallback callback) {
+        JsonObject infoJson = new Gson().fromJson(json, JsonObject.class);
+        if (infoJson == null) {
+            callback.error("解析配置失败");
+            return;
+        }
+        if (infoJson.has("urls") && infoJson.get("urls").isJsonArray()) {
+            List<StoreBean> stores = parseStoreList(infoJson.getAsJsonArray("urls"));
+            if (stores.isEmpty()) {
+                storeBeanList = new ArrayList<>();
+                callback.error("多仓列表为空");
+                return;
+            }
+            storeBeanList = stores;
+            StoreBean remembered = findRememberedStore(stores);
+            if (remembered != null) {
+                Hawk.put(HawkConfig.STORE_NAME, remembered.getName());
+                loadChildConfig(remembered.getUrl(), useCache, callback);
+            } else {
+                callback.needSelect(stores);
+            }
+            return;
+        }
+        storeBeanList = new ArrayList<>();
+        parseJson(apiUrl, json);
+        callback.success();
+    }
+
+    private StoreBean findRememberedStore(List<StoreBean> stores) {
+        String storeApi = Hawk.get(HawkConfig.STORE_API, "");
+        if (TextUtils.isEmpty(storeApi))
+            return null;
+        for (StoreBean bean : stores) {
+            if (storeApi.equals(bean.getUrl()))
+                return bean;
+        }
+        return null;
+    }
+
+    private List<StoreBean> parseStoreList(JsonArray urls) {
+        List<StoreBean> stores = new ArrayList<>();
+        int index = 1;
+        for (JsonElement el : urls) {
+            if (el == null || !el.isJsonObject())
+                continue;
+            JsonObject obj = el.getAsJsonObject();
+            String url = DefaultConfig.safeJsonString(obj, "url", "").trim();
+            if (url.isEmpty())
+                continue;
+            String name = DefaultConfig.safeJsonString(obj, "name", "").trim();
+            if (name.isEmpty())
+                name = "仓库" + index;
+            stores.add(new StoreBean(name, url));
+            index++;
+        }
+        return stores;
+    }
+
+    private void loadChildConfig(String storeUrl, boolean useCache, LoadConfigCallback callback) {
+        fetchJson(storeUrl, useCache, new FetchCallback() {
+            @Override
+            public void onSuccess(String json) {
+                try {
+                    parseJson(storeUrl, json);
+                    callback.success();
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                    callback.error("解析配置失败");
+                }
+            }
+
+            @Override
+            public void onError(String msg) {
+                callback.error(msg);
+            }
+        });
+    }
+
+    private interface FetchCallback {
+        void onSuccess(String json);
+
+        void onError(String msg);
+    }
+
+    private void fetchJson(String url, boolean useCache, FetchCallback callback) {
+        File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(url));
         if (useCache && cache.exists()) {
             try {
-                parseJson(apiUrl, cache);
-                callback.success();
+                callback.onSuccess(readFile(cache));
                 return;
             } catch (Throwable th) {
                 th.printStackTrace();
             }
         }
-        String apiFix = apiUrl;
-        if (apiUrl.startsWith("clan://")) {
-            apiFix = clanToAddress(apiUrl);
+        String apiFix = url;
+        if (url.startsWith("clan://")) {
+            apiFix = clanToAddress(url);
         }
         OkGo.<String>get(apiFix)
+                .tag(url)
                 .execute(new AbsCallback<String>() {
                     @Override
                     public void onSuccess(Response<String> response) {
                         try {
                             String json = response.body();
-                            parseJson(apiUrl, response.body());
                             try {
                                 File cacheDir = cache.getParentFile();
-                                if (!cacheDir.exists())
+                                if (cacheDir != null && !cacheDir.exists())
                                     cacheDir.mkdirs();
                                 if (cache.exists())
                                     cache.delete();
@@ -120,10 +250,10 @@ public class ApiConfig {
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
-                            callback.success();
+                            callback.onSuccess(json);
                         } catch (Throwable th) {
                             th.printStackTrace();
-                            callback.error("解析配置失败");
+                            callback.onError("解析配置失败");
                         }
                     }
 
@@ -132,14 +262,13 @@ public class ApiConfig {
                         super.onError(response);
                         if (cache.exists()) {
                             try {
-                                parseJson(apiUrl, cache);
-                                callback.success();
+                                callback.onSuccess(readFile(cache));
                                 return;
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
                         }
-                        callback.error("拉取配置失败\n" + (response.getException() != null ? response.getException().getMessage() : ""));
+                        callback.onError("拉取配置失败\n" + (response.getException() != null ? response.getException().getMessage() : ""));
                     }
 
                     public String convertResponse(okhttp3.Response response) throws Throwable {
@@ -149,12 +278,24 @@ public class ApiConfig {
                         } else {
                             result = response.body().string();
                         }
-                        if (apiUrl.startsWith("clan")) {
-                            result = clanContentFix(clanToAddress(apiUrl), result);
+                        if (url.startsWith("clan")) {
+                            result = clanContentFix(clanToAddress(url), result);
                         }
                         return result;
                     }
                 });
+    }
+
+    private String readFile(File f) throws Throwable {
+        System.out.println("从本地缓存加载" + f.getAbsolutePath());
+        BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+        StringBuilder sb = new StringBuilder();
+        String s;
+        while ((s = bReader.readLine()) != null) {
+            sb.append(s).append("\n");
+        }
+        bReader.close();
+        return sb.toString();
     }
 
 
@@ -217,21 +358,13 @@ public class ApiConfig {
         });
     }
 
-    private void parseJson(String apiUrl, File f) throws Throwable {
-        System.out.println("从本地缓存加载" + f.getAbsolutePath());
-        BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        String s = "";
-        while ((s = bReader.readLine()) != null) {
-            sb.append(s + "\n");
-        }
-        bReader.close();
-        parseJson(apiUrl, sb.toString());
-    }
-
     private void parseJson(String apiUrl, String jsonStr) {
         JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
         jsLoader.clear();
+        sourceBeanList.clear();
+        parseBeanList.clear();
+        mHomeSource = null;
+        mDefaultParse = null;
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
         // wallpaper
@@ -437,6 +570,8 @@ public class ApiConfig {
         void retry();
 
         void error(String msg);
+
+        void needSelect(List<StoreBean> stores);
     }
 
     public interface FastParseCallback {
