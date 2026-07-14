@@ -425,16 +425,39 @@ public class SourceViewModel extends ViewModel {
     // detailContent
     public void getDetail(String sourceKey, String id) {
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        if (sourceBean == null) {
+            detailResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             spThreadPool.execute(new Runnable() {
                 @Override
                 public void run() {
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    Future<String> future = executor.submit(new Callable<String>() {
+                        @Override
+                        public String call() throws Exception {
+                            Spider sp = ApiConfig.get().getCSP(sourceBean);
+                            List<String> ids = new ArrayList<>();
+                            ids.add(id);
+                            return sp.detailContent(ids);
+                        }
+                    });
+                    String detailJson = null;
                     try {
-                        Spider sp = ApiConfig.get().getCSP(sourceBean);
-                        List<String> ids = new ArrayList<>();
-                        ids.add(id);
-                        json(detailResult, sp.detailContent(ids), sourceBean.getKey());
+                        detailJson = future.get(15, TimeUnit.SECONDS);
+                    } catch (TimeoutException e) {
+                        LOG.i("getDetail timeout key=" + sourceKey + " id=" + id);
+                        e.printStackTrace();
+                        future.cancel(true);
+                    } catch (InterruptedException | ExecutionException e) {
+                        Throwable cause = e.getCause() != null ? e.getCause() : e;
+                        LOG.i("getDetail failed key=" + sourceKey + " id=" + id
+                                + " err=" + e.getClass().getSimpleName()
+                                + " cause=" + cause.getClass().getSimpleName()
+                                + ": " + cause.getMessage());
+                        e.printStackTrace();
                     } catch (Throwable th) {
                         Throwable cause = th.getCause() != null ? th.getCause() : th;
                         LOG.i("getDetail failed key=" + sourceKey + " id=" + id
@@ -442,11 +465,22 @@ public class SourceViewModel extends ViewModel {
                                 + " cause=" + cause.getClass().getSimpleName()
                                 + ": " + cause.getMessage());
                         th.printStackTrace();
-                        detailResult.postValue(null);
+                    } finally {
+                        if (detailJson != null) {
+                            json(detailResult, detailJson, sourceBean.getKey());
+                        } else {
+                            detailResult.postValue(null);
+                        }
+                        try {
+                            executor.shutdown();
+                        } catch (Throwable th) {
+                            th.printStackTrace();
+                        }
                     }
                 }
             });
-        } else if (type == 0 || type == 1|| type == 4) {
+        } else if (type == 0 || type == 1 || type == 4) {
+            OkGo.getInstance().cancelTag("detail");
             OkGo.<String>get(sourceBean.getApi())
                     .tag("detail")
                     .params("ac", type == 0 ? "videolist" : "detail")
@@ -487,15 +521,48 @@ public class SourceViewModel extends ViewModel {
     // searchContent
     public void getSearch(String sourceKey, String wd) {
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        if (sourceBean == null) {
+            searchResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
-            try {
-                Spider sp = ApiConfig.get().getCSP(sourceBean);
-                json(searchResult, sp.searchContent(wd, false), sourceBean.getKey());
-            } catch (Throwable th) {
-                th.printStackTrace();
-            }
+            spThreadPool.execute(new Runnable() {
+                @Override
+                public void run() {
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    Future<String> future = executor.submit(new Callable<String>() {
+                        @Override
+                        public String call() throws Exception {
+                            Spider sp = ApiConfig.get().getCSP(sourceBean);
+                            return sp.searchContent(wd, false);
+                        }
+                    });
+                    String searchJson = null;
+                    try {
+                        searchJson = future.get(15, TimeUnit.SECONDS);
+                    } catch (TimeoutException e) {
+                        LOG.i("getSearch timeout key=" + sourceKey + " wd=" + wd);
+                        e.printStackTrace();
+                        future.cancel(true);
+                    } catch (Throwable th) {
+                        th.printStackTrace();
+                    } finally {
+                        if (searchJson != null) {
+                            json(searchResult, searchJson, sourceBean.getKey());
+                        } else {
+                            searchResult.postValue(null);
+                        }
+                        try {
+                            executor.shutdown();
+                        } catch (Throwable th) {
+                            th.printStackTrace();
+                        }
+                    }
+                }
+            });
         } else if (type == 0 || type == 1) {
+            OkGo.getInstance().cancelTag("search");
             OkGo.<String>get(sourceBean.getApi())
                     .params("wd", wd)
                     .params(type == 1 ? "ac" : null, type == 1 ? "detail" : null)
@@ -524,11 +591,12 @@ public class SourceViewModel extends ViewModel {
                         @Override
                         public void onError(Response<String> response) {
                             super.onError(response);
-                            // searchResult.postValue(null);
+                            searchResult.postValue(null);
                             EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, null));
                         }
                     });
-        }else if (type == 4) {
+        } else if (type == 4) {
+            OkGo.getInstance().cancelTag("search");
             OkGo.<String>get(sourceBean.getApi())
                 .params("wd", wd)
                 .params("ac" ,"detail")
@@ -554,7 +622,7 @@ public class SourceViewModel extends ViewModel {
                     @Override
                     public void onError(Response<String> response) {
                         super.onError(response);
-                        // searchResult.postValue(null);
+                        searchResult.postValue(null);
                         EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, null));
                     }
                 });
@@ -899,8 +967,10 @@ public class SourceViewModel extends ViewModel {
             absXml(data, sourceKey);
             if (searchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, data));
+                searchResult.postValue(data);
             } else if (quickSearchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, data));
+                quickSearchResult.postValue(data);
             } else if (result != null) {
                 if (result == detailResult) {
                     checkThunder(data);
@@ -912,8 +982,10 @@ public class SourceViewModel extends ViewModel {
         } catch (Exception e) {
             if (searchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, null));
+                searchResult.postValue(null);
             } else if (quickSearchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, null));
+                quickSearchResult.postValue(null);
             } else if (result != null) {
                 result.postValue(null);
             }
@@ -946,8 +1018,10 @@ public class SourceViewModel extends ViewModel {
             absXml(data, sourceKey);
             if (searchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, data));
+                searchResult.postValue(data);
             } else if (quickSearchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, data));
+                quickSearchResult.postValue(data);
             } else if (result != null) {
                 if (result == detailResult) {
                     checkThunder(data);
@@ -959,8 +1033,10 @@ public class SourceViewModel extends ViewModel {
         } catch (Exception e) {
             if (searchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SEARCH_RESULT, null));
+                searchResult.postValue(null);
             } else if (quickSearchResult == result) {
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_RESULT, null));
+                quickSearchResult.postValue(null);
             } else if (result != null) {
                 result.postValue(null);
             }

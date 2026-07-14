@@ -83,7 +83,9 @@ fun SearchScreen(
             state.loading -> LoadingState()
             state.error != null && state.items.isEmpty() ->
                 ErrorState(message = state.error!!, onRetry = { viewModel.search() })
-            state.items.isEmpty() -> EmptyState("输入关键字并搜索")
+            state.items.isEmpty() -> EmptyState(
+                if (state.query.isBlank()) "输入关键字并搜索" else "未找到相关内容",
+            )
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(5),
                 contentPadding = PaddingValues(4.dp),

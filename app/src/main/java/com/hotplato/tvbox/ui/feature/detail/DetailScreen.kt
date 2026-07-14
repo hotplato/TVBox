@@ -1,6 +1,7 @@
 package com.hotplato.tvbox.ui.feature.detail
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,14 +45,20 @@ fun DetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    BackHandler(onBack = onBack)
+
     LaunchedEffect(sourceKey, vodId) {
         viewModel.load(sourceKey, vodId)
     }
 
     when {
-        state.loading -> LoadingState()
+        state.loading -> LoadingState(onBack = onBack)
         state.error != null && state.vodInfo == null ->
-            ErrorState(message = state.error!!, onRetry = { viewModel.load(sourceKey, vodId) })
+            ErrorState(
+                message = state.error!!,
+                onRetry = { viewModel.load(sourceKey, vodId) },
+                onBack = onBack,
+            )
         else -> {
             val info = state.vodInfo!!
             Column(

@@ -1,8 +1,10 @@
 package com.hotplato.tvbox.ui.feature.search
 
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hotplato.tvbox.api.ApiConfig
+import com.hotplato.tvbox.bean.AbsXml
 import com.hotplato.tvbox.bean.Movie
 import com.hotplato.tvbox.viewmodel.SourceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,17 +25,19 @@ class SearchViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    init {
-        sourceViewModel.searchResult.observeForever { abs ->
-            val videos = abs?.movie?.videoList ?: emptyList()
-            _uiState.update {
-                it.copy(
-                    loading = false,
-                    items = videos,
-                    error = if (abs == null) "搜索失败" else null,
-                )
-            }
+    private val searchObserver = Observer<AbsXml?> { abs ->
+        val videos = abs?.movie?.videoList ?: emptyList()
+        _uiState.update {
+            it.copy(
+                loading = false,
+                items = videos,
+                error = if (abs == null) "搜索失败" else null,
+            )
         }
+    }
+
+    init {
+        sourceViewModel.searchResult.observeForever(searchObserver)
     }
 
     fun onQueryChange(value: String) {
@@ -55,7 +59,7 @@ class SearchViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        sourceViewModel.searchResult.removeObserver { }
+        sourceViewModel.searchResult.removeObserver(searchObserver)
         super.onCleared()
     }
 }

@@ -3,7 +3,9 @@ package com.hotplato.tvbox.ui.component
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,13 +16,38 @@ import androidx.tv.material3.Text
 import com.hotplato.tvbox.ui.theme.TvMuted
 
 @Composable
-fun LoadingState(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = "加载中…",
-            style = MaterialTheme.typography.titleLarge,
-            color = TvMuted,
-        )
+fun LoadingState(
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
+) {
+    if (onBack == null) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = "加载中…",
+                style = MaterialTheme.typography.titleLarge,
+                color = TvMuted,
+            )
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(24.dp),
+        ) {
+            TvFocusButton(text = "返回", onClick = onBack)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "加载中…",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TvMuted,
+                )
+            }
+        }
     }
 }
 
@@ -42,6 +69,7 @@ fun EmptyState(
 fun ErrorState(
     message: String,
     onRetry: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -56,12 +84,16 @@ fun ErrorState(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        if (onRetry != null) {
-            TvFocusButton(
-                text = "重试",
-                onClick = onRetry,
-                modifier = Modifier.padding(top = 20.dp),
-            )
+        Row(
+            modifier = Modifier.padding(top = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (onBack != null) {
+                TvFocusButton(text = "返回", onClick = onBack)
+            }
+            if (onRetry != null) {
+                TvFocusButton(text = "重试", onClick = onRetry)
+            }
         }
     }
 }
