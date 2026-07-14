@@ -220,7 +220,7 @@ public class ApiConfig {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(url));
         if (useCache && cache.exists()) {
             try {
-                callback.onSuccess(readFile(cache));
+                callback.onSuccess(fixContentPath(url, readFile(cache)));
                 return;
             } catch (Throwable th) {
                 th.printStackTrace();
@@ -250,7 +250,7 @@ public class ApiConfig {
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
-                            callback.onSuccess(json);
+                            callback.onSuccess(fixContentPath(url, json));
                         } catch (Throwable th) {
                             th.printStackTrace();
                             callback.onError("解析配置失败");
@@ -262,7 +262,7 @@ public class ApiConfig {
                         super.onError(response);
                         if (cache.exists()) {
                             try {
-                                callback.onSuccess(readFile(cache));
+                                callback.onSuccess(fixContentPath(url, readFile(cache)));
                                 return;
                             } catch (Throwable th) {
                                 th.printStackTrace();
@@ -451,37 +451,49 @@ public class ApiConfig {
         } catch (Throwable th) {
             th.printStackTrace();
         }
-        // 广告地址
-        for (JsonElement host : infoJson.getAsJsonArray("ads")) {
-            AdBlocker.addAdHost(host.getAsString());
+        // 广告地址（可选）
+        JsonArray ads = infoJson.getAsJsonArray("ads");
+        if (ads != null) {
+            for (JsonElement host : ads) {
+                AdBlocker.addAdHost(host.getAsString());
+            }
         }
-        // IJK解码配置
+        // IJK解码配置（可选；部分订阅如 jsm.json 不提供 ijk）
         boolean foundOldSelect = false;
         String ijkCodec = Hawk.get(HawkConfig.IJK_CODEC, "");
         ijkCodes = new ArrayList<>();
-        for (JsonElement opt : infoJson.get("ijk").getAsJsonArray()) {
-            JsonObject obj = (JsonObject) opt;
-            String name = obj.get("group").getAsString();
-            LinkedHashMap<String, String> baseOpt = new LinkedHashMap<>();
-            for (JsonElement cfg : obj.get("options").getAsJsonArray()) {
-                JsonObject cObj = (JsonObject) cfg;
-                String key = cObj.get("category").getAsString() + "|" + cObj.get("name").getAsString();
-                String val = cObj.get("value").getAsString();
-                baseOpt.put(key, val);
+        JsonElement ijkEl = infoJson.get("ijk");
+        if (ijkEl != null && ijkEl.isJsonArray()) {
+            for (JsonElement opt : ijkEl.getAsJsonArray()) {
+                JsonObject obj = (JsonObject) opt;
+                String name = obj.get("group").getAsString();
+                LinkedHashMap<String, String> baseOpt = new LinkedHashMap<>();
+                for (JsonElement cfg : obj.get("options").getAsJsonArray()) {
+                    JsonObject cObj = (JsonObject) cfg;
+                    String key = cObj.get("category").getAsString() + "|" + cObj.get("name").getAsString();
+                    String val = cObj.get("value").getAsString();
+                    baseOpt.put(key, val);
+                }
+                IJKCode codec = new IJKCode();
+                codec.setName(name);
+                codec.setOption(baseOpt);
+                if (name.equals(ijkCodec) || TextUtils.isEmpty(ijkCodec)) {
+                    codec.selected(true);
+                    ijkCodec = name;
+                    foundOldSelect = true;
+                } else {
+                    codec.selected(false);
+                }
+                ijkCodes.add(codec);
             }
-            IJKCode codec = new IJKCode();
-            codec.setName(name);
-            codec.setOption(baseOpt);
-            if (name.equals(ijkCodec) || TextUtils.isEmpty(ijkCodec)) {
-                codec.selected(true);
-                ijkCodec = name;
-                foundOldSelect = true;
-            } else {
-                codec.selected(false);
-            }
-            ijkCodes.add(codec);
         }
-        if (!foundOldSelect && ijkCodes.size() > 0) {
+        if (ijkCodes.isEmpty()) {
+            IJKCode fallback = new IJKCode();
+            fallback.setName("默认");
+            fallback.setOption(new LinkedHashMap<>());
+            fallback.selected(true);
+            ijkCodes.add(fallback);
+        } else if (!foundOldSelect) {
             ijkCodes.get(0).selected(true);
         }
     }
@@ -633,6 +645,8 @@ public class ApiConfig {
     }
 
     public IJKCode getIJKCodec(String name) {
+        if (ijkCodes == null || ijkCodes.isEmpty())
+            return null;
         for (IJKCode code : ijkCodes) {
             if (code.getName().equals(name))
                 return code;
@@ -653,5 +667,24 @@ public class ApiConfig {
     String clanContentFix(String lanLink, String content) {
         String fix = lanLink.substring(0, lanLink.indexOf("/file/") + 6);
         return content.replace("clan://", fix);
+    }
+
+    /**
+     * 将配置 JSON 中的相对路径（如 "./jar/spider.jar"）展开为相对配置 URL 目录的绝对地址。
+     */
+    String fixContentPath(String url, String content) {
+        if (TextUtils.isEmpty(content) || !content.contains("\"./"))
+            return content;
+        if (TextUtils.isEmpty(url))
+            return content;
+        url = url.replace("file://", "clan://localhost/");
+        if (!url.startsWith("http") && !url.startsWith("clan://"))
+            url = "http://" + url;
+        if (url.startsWith("clan://"))
+            url = clanToAddress(url);
+        int slash = url.lastIndexOf("/");
+        if (slash < 0)
+            return content;
+        return content.replace("./", url.substring(0, slash + 1));
     }
 }
