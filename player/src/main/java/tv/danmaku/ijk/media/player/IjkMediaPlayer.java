@@ -188,6 +188,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 if (libLoader == null)
                     libLoader = sLocalLibLoader;
 
+                // arm64 split build needs ffmpeg/sdl first; fat armeabi may omit them
+                try {
+                    libLoader.loadLibrary("ijkffmpeg");
+                    libLoader.loadLibrary("ijksdl");
+                } catch (Throwable ignored) {
+                }
                 libLoader.loadLibrary("player");
                 mIsLibLoaded = true;
             }
