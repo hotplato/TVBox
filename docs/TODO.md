@@ -10,11 +10,6 @@
 - **范围**：去掉 `force` 升级到 OkHttp 4.x；适配 `OkGoHelper`、DoH、图片加载；评估是否改用 Media3 OkHttp DataSource。
 - **说明**：不并入「Media3 + 去 DK 壳」播放器改造；播放期仍用 Media3 `DefaultHttpDataSource`。
 
-### 详情页选集不可见
-
-- **现象**：海报 + 线路占满首屏，选集在下方被裁切；焦点可盲进播放，但屏上看不到选集按钮。
-- **方向**：`DetailScreen` 外层 `Column` 不可滚，底部 `LazyVerticalGrid` 用 `fillMaxSize()` 不当；改为 `weight(1f)` 或整页可滚。
-
 ### 详情简介 HTML 实体未解码
 
 - **现象**：简介出现字面量 `&nbsp;`、`&#13;&#10;` 等。
@@ -44,6 +39,11 @@
 ---
 
 ## 已完成
+
+### 详情页选集不可见
+
+- **根因**：`DetailScreen` 外层 `Column` 不可滚，底部 `LazyVerticalGrid` 用 `fillMaxSize()` 与上方海报/线路争高，选集被裁切。
+- **修复**：网格改为 `weight(1f).fillMaxWidth()`，占剩余视口高度并可纵向滚动。
 
 ### 源站封面加载失败（分类 / 搜索 / 详情）
 
