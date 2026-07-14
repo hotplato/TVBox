@@ -1,6 +1,11 @@
 package com.hotplato.tvbox.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -12,6 +17,7 @@ import com.hotplato.tvbox.ui.feature.detail.DetailScreen
 import com.hotplato.tvbox.ui.feature.history.HistoryScreen
 import com.hotplato.tvbox.ui.feature.home.HomeScreen
 import com.hotplato.tvbox.ui.feature.home.HomeViewModel
+import com.hotplato.tvbox.ui.feature.mine.MineScreen
 import com.hotplato.tvbox.ui.feature.push.PushScreen
 import com.hotplato.tvbox.ui.feature.search.SearchScreen
 import com.hotplato.tvbox.ui.feature.settings.SettingsScreen
@@ -24,6 +30,8 @@ fun TvBoxNavGraph(
     homeViewModel: HomeViewModel,
     modifier: Modifier = Modifier,
 ) {
+    var restoreMineFocus by remember { mutableStateOf(false) }
+
     NavHost(
         navController = navController,
         startDestination = TvBoxRoutes.HOME,
@@ -37,11 +45,24 @@ fun TvBoxNavGraph(
                 onOpenSearch = { query ->
                     navController.navigate(TvBoxRoutes.search(query))
                 },
-                onOpenSettings = { navController.navigate(TvBoxRoutes.SETTINGS) },
+                onOpenMine = { navController.navigate(TvBoxRoutes.MINE) },
+                restoreMineFocus = restoreMineFocus,
+                onMineFocusConsumed = { restoreMineFocus = false },
+                viewModel = homeViewModel,
+            )
+        }
+        composable(TvBoxRoutes.MINE) {
+            val leaveMine: () -> Unit = {
+                restoreMineFocus = true
+                navController.popBackStack()
+            }
+            BackHandler(onBack = leaveMine)
+            MineScreen(
+                onBack = leaveMine,
                 onOpenHistory = { navController.navigate(TvBoxRoutes.HISTORY) },
                 onOpenCollect = { navController.navigate(TvBoxRoutes.COLLECT) },
                 onOpenPush = { navController.navigate(TvBoxRoutes.PUSH) },
-                viewModel = homeViewModel,
+                onOpenSettings = { navController.navigate(TvBoxRoutes.SETTINGS) },
             )
         }
         composable(

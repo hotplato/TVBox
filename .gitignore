@@ -72,6 +72,9 @@ fastlane/readme.md
 # Version control
 vcs.xml
 
+# Local brainstorm / agent scratch
+.superpowers/
+
 # lint
 lint/intermediates/
 lint/generated/

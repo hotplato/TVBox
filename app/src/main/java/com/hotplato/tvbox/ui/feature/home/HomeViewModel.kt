@@ -12,6 +12,7 @@ import com.hotplato.tvbox.bean.AbsSortXml
 import com.hotplato.tvbox.bean.AbsXml
 import com.hotplato.tvbox.bean.Movie
 import com.hotplato.tvbox.bean.MovieSort
+import com.hotplato.tvbox.bean.SourceBean
 import com.hotplato.tvbox.bean.StoreBean
 import com.hotplato.tvbox.bean.VodInfo
 import com.hotplato.tvbox.cache.RoomDataManger
@@ -162,6 +163,22 @@ class HomeViewModel : ViewModel() {
             Hawk.put(HawkConfig.STORE_NAME, store.name ?: "")
             bootstrap(false)
         }
+    }
+
+    fun switchHomeSource(source: SourceBean) {
+        ApiConfig.get().setSourceBean(source)
+        _uiState.update {
+            it.copy(
+                homeName = source.name ?: "",
+                loading = true,
+                error = null,
+                sorts = emptyList(),
+                videos = emptyList(),
+                selectedSortIndex = 0,
+            )
+        }
+        val key = source.key
+        sourceViewModel.getSort(key)
     }
 
     fun selectSort(index: Int) {

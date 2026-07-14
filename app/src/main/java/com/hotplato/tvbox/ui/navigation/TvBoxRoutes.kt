@@ -2,6 +2,7 @@ package com.hotplato.tvbox.ui.navigation
 
 object TvBoxRoutes {
     const val HOME = "home"
+    const val MINE = "mine"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val HISTORY = "history"
