@@ -7,6 +7,8 @@ import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
 import com.hotplato.tvbox.base.App;
 import com.hotplato.tvbox.bean.SourceBean;
+import com.hotplato.tvbox.crawler.opt.JarMd5Index;
+import com.hotplato.tvbox.crawler.opt.SpiderRuntime;
 import com.hotplato.tvbox.util.LOG;
 import com.hotplato.tvbox.util.MD5;
 import com.lzy.okgo.OkGo;
@@ -50,6 +52,7 @@ public class SpiderManager {
         jsLoader.clear();
         jarLoader.clearSpiders();
         loggedNullKeys.clear();
+        SpiderRuntime.reset();
     }
 
     public static boolean isJsSpiderApi(String api) {
@@ -73,6 +76,20 @@ public class SpiderManager {
         return logIfNull(key, api, sp);
     }
 
+    /** JS 实例池：创建不入缓存的 Spider（失败为 SpiderNull）。 */
+    public Spider createJsSpider(SourceBean sourceBean) {
+        if (sourceBean == null) {
+            return logAndReturnNull("", "", SpiderFailReason.API_UNSUPPORTED, "sourceBean=null");
+        }
+        String key = sourceBean.getKey();
+        String api = sourceBean.getApi();
+        if (!isJsSpiderApi(api)) {
+            return logAndReturnNull(key, api, SpiderFailReason.API_UNSUPPORTED, api);
+        }
+        Spider sp = jsLoader.createSpider(key, api, sourceBean.getExt(), sourceBean.getJar());
+        return logIfNull(key, api, sp);
+    }
+
     public void loadJar(boolean useCache, String spider, JarLoadCallback callback) {
         String[] urls = spider.split(";md5;");
         String jarUrl = urls[0];
@@ -81,19 +98,30 @@ public class SpiderManager {
 
         if ((!md5.isEmpty() || useCache) && cache.exists()) {
             jarLoadExecutor.execute(() -> {
-                if (useCache || MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
+                if (useCache) {
+                    loadJarAndPost(cache.getAbsolutePath(), callback);
+                    return;
+                }
+                if (JarMd5Index.matchesConfigured(cache, md5)) {
+                    LOG.i("SpiderManager", "jar md5 sidecar hit, skip full-file scan");
+                    loadJarAndPost(cache.getAbsolutePath(), callback);
+                    return;
+                }
+                if (MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
+                    JarMd5Index.write(cache, md5);
                     loadJarAndPost(cache.getAbsolutePath(), callback);
                 } else {
-                    mainHandler.post(() -> downloadJar(jarUrl, cache, callback));
+                    JarMd5Index.delete(cache);
+                    mainHandler.post(() -> downloadJar(jarUrl, cache, md5, callback));
                 }
             });
             return;
         }
 
-        downloadJar(jarUrl, cache, callback);
+        downloadJar(jarUrl, cache, md5, callback);
     }
 
-    private void downloadJar(String jarUrl, File cache, JarLoadCallback callback) {
+    private void downloadJar(String jarUrl, File cache, String md5, JarLoadCallback callback) {
         OkGo.<File>get(jarUrl).execute(new AbsCallback<File>() {
 
             @Override
@@ -105,11 +133,17 @@ public class SpiderManager {
                     cache.setWritable(true);
                     cache.delete();
                 }
+                JarMd5Index.delete(cache);
                 FileOutputStream fos = new FileOutputStream(cache);
                 fos.write(response.body().bytes());
                 fos.flush();
                 fos.close();
                 cache.setReadOnly();
+                if (!md5.isEmpty()) {
+                    JarMd5Index.write(cache, md5);
+                } else {
+                    JarMd5Index.write(cache, MD5.getFileMd5(cache));
+                }
                 return cache;
             }
 

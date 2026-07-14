@@ -17,9 +17,9 @@ import com.hotplato.tvbox.bean.StoreBean;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.util.AdBlocker;
 import com.hotplato.tvbox.util.DefaultConfig;
+import com.hotplato.tvbox.util.GsonHolder;
 import com.hotplato.tvbox.util.HawkConfig;
 import com.hotplato.tvbox.util.MD5;
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -131,7 +131,7 @@ public class ApiConfig {
     }
 
     private void handleRootConfig(String apiUrl, String json, boolean useCache, LoadConfigCallback callback) {
-        JsonObject infoJson = new Gson().fromJson(json, JsonObject.class);
+        JsonObject infoJson = GsonHolder.gson.fromJson(json, JsonObject.class);
         if (infoJson == null) {
             callback.error("解析配置失败");
             return;
@@ -312,7 +312,7 @@ public class ApiConfig {
     }
 
     private void parseJson(String apiUrl, String jsonStr) {
-        JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+        JsonObject infoJson = GsonHolder.gson.fromJson(jsonStr, JsonObject.class);
         spiderManager.reset();
         sourceBeanList.clear();
         parseBeanList.clear();
@@ -508,6 +508,11 @@ public class ApiConfig {
 
     public Spider getCSP(SourceBean sourceBean) {
         return spiderManager.getSpider(sourceBean);
+    }
+
+    /** JS 实例池用：不写入 JsLoader 静态缓存。 */
+    public Spider createJsSpider(SourceBean sourceBean) {
+        return spiderManager.createJsSpider(sourceBean);
     }
 
     public Object[] proxyLocal(Map param) {

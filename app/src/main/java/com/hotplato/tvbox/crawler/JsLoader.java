@@ -8,6 +8,8 @@ import com.github.catvod.crawler.SpiderNull;
 
 import com.hotplato.tvbox.base.App;
 
+import com.hotplato.tvbox.crawler.opt.JarMd5Index;
+import com.hotplato.tvbox.crawler.opt.SpiderRuntime;
 import com.hotplato.tvbox.util.FileUtils;
 import com.hotplato.tvbox.util.LOG;
 import com.hotplato.tvbox.util.MD5;
@@ -37,6 +39,7 @@ public class JsLoader {
             spider.cancelByTag();
             spider.destroy();
         }
+        SpiderRuntime.reset();
     }
     public void clear() {
         spiders.clear();
@@ -89,7 +92,13 @@ public class JsLoader {
         }
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp/" + key + ".jar");
         if (!md5.isEmpty()) {
+            if (cache.exists() && JarMd5Index.matchesConfigured(cache, md5)) {
+                Log.i("JSLoader", "jsapi md5 sidecar hit, skip full-file scan");
+                loadClassLoader(cache.getAbsolutePath(), key);
+                return classes.get(key);
+            }
             if (cache.exists() && MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
+                JarMd5Index.write(cache, md5);
                 loadClassLoader(cache.getAbsolutePath(), key);
                 return classes.get(key);
             }
@@ -106,6 +115,7 @@ public class JsLoader {
                 //noinspection ResultOfMethodCallIgnored
                 parent.mkdirs();
             }
+            JarMd5Index.delete(cache);
             Response response = OkGo.<File>get(jar).execute();
             InputStream is = response.body().byteStream();
             OutputStream os = new FileOutputStream(cache);
@@ -123,6 +133,9 @@ public class JsLoader {
                     e.printStackTrace();
                 }
             }
+            if (!md5.isEmpty()) {
+                JarMd5Index.write(cache, md5);
+            }
             loadClassLoader(cache.getAbsolutePath(), key);
             return classes.get(key);
         } catch (Throwable e) {
@@ -136,8 +149,17 @@ public class JsLoader {
             Log.i("JSLoader", "echo-getSpider cached");
             return spiders.get(key);
         }
+        Spider sp = createSpider(key, api, ext, jar);
+        spiders.put(key, sp);
+        return sp;
+    }
+
+    /**
+     * 创建 JS Spider 实例，不写入静态缓存（供实例池借还多实例）。
+     */
+    public Spider createSpider(String key, String api, String ext, String jar) {
         Class<?> classLoader = null;
-        if (!jar.isEmpty()) {
+        if (jar != null && !jar.isEmpty()) {
             String[] urls = jar.split(";md5;");
             String jarUrl = urls[0];
             String jarKey = MD5.string2MD5(jarUrl);
@@ -146,17 +168,14 @@ public class JsLoader {
         }
         recentKey = key;
         try {
-            Log.i("JSLoader", "echo-getSpider load");
+            Log.i("JSLoader", "echo-createSpider load");
             Spider sp = new JsSpider(key, api, classLoader);
             sp.init(App.getInstance(), ext);
-            spiders.put(key, sp);
             return sp;
         } catch (Throwable th) {
             LOG.i("echo-getSpider-error "+th.getMessage());
             String detail = th.getMessage() != null ? th.getMessage() : th.getClass().getSimpleName();
-            Spider nullSpider = new SpiderNull(SpiderFailReason.JS_LOAD_FAILED, detail);
-            spiders.put(key, nullSpider);
-            return nullSpider;
+            return new SpiderNull(SpiderFailReason.JS_LOAD_FAILED, detail);
         }
     }
 

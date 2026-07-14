@@ -21,6 +21,8 @@ import javax.net.ssl.X509TrustManager;
 
 import com.hotplato.tvbox.ui.image.CoilSetup;
 import okhttp3.Cache;
+import okhttp3.ConnectionPool;
+import okhttp3.Dispatcher;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.dnsoverhttps.DnsOverHttps;
@@ -96,6 +98,12 @@ public class OkGoHelper {
         builder.readTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS);
         builder.writeTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS);
         builder.connectTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS);
+
+        builder.connectionPool(new ConnectionPool(32, 5, TimeUnit.MINUTES));
+        Dispatcher dispatcher = new Dispatcher();
+        dispatcher.setMaxRequests(64);
+        dispatcher.setMaxRequestsPerHost(16);
+        builder.dispatcher(dispatcher);
 
         builder.dns(dnsOverHttps);
         try {
