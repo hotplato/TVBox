@@ -7,6 +7,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 import com.github.catvod.crawler.Spider;
+import com.github.catvod.crawler.SpiderNull;
 import com.hotplato.tvbox.api.ApiConfig;
 import com.hotplato.tvbox.base.App;
 import com.hotplato.tvbox.bean.AbsJson;
@@ -90,6 +91,10 @@ public class SourceViewModel extends ViewModel {
                         @Override
                         public String call() throws Exception {
                             Spider sp = ApiConfig.get().getCSP(sourceBean);
+                            if (sp instanceof SpiderNull) {
+                                SpiderNull sn = (SpiderNull) sp;
+                                LOG.i("getSort SpiderNull key=" + sourceBean.getKey() + " reason=" + sn.getReason());
+                            }
                             return sp.homeContent(true);
                         }
                     });

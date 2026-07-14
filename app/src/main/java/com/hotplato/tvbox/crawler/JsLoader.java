@@ -153,8 +153,11 @@ public class JsLoader {
             return sp;
         } catch (Throwable th) {
             LOG.i("echo-getSpider-error "+th.getMessage());
+            String detail = th.getMessage() != null ? th.getMessage() : th.getClass().getSimpleName();
+            Spider nullSpider = new SpiderNull(SpiderFailReason.JS_LOAD_FAILED, detail);
+            spiders.put(key, nullSpider);
+            return nullSpider;
         }
-        return new SpiderNull();
     }
 
     public Object[] proxyInvoke(Map<String, String> params) {

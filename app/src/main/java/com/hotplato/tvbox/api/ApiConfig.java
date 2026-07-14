@@ -6,8 +6,7 @@ import android.text.TextUtils;
 import android.util.Base64;
 
 import com.github.catvod.crawler.Spider;
-import com.hotplato.tvbox.crawler.JarLoader;
-import com.hotplato.tvbox.crawler.JsLoader;
+import com.hotplato.tvbox.crawler.SpiderManager;
 import com.hotplato.tvbox.base.App;
 import com.hotplato.tvbox.bean.LiveChannelGroup;
 import com.hotplato.tvbox.bean.IJKCode;
@@ -61,8 +60,7 @@ public class ApiConfig {
 
     private SourceBean emptyHome = new SourceBean();
 
-    private JarLoader jarLoader = new JarLoader();
-    private JsLoader jsLoader = new JsLoader();
+    private final SpiderManager spiderManager = new SpiderManager();
     private List<StoreBean> storeBeanList = new ArrayList<>();
 
     private ApiConfig() {
@@ -300,67 +298,22 @@ public class ApiConfig {
 
 
     public void loadJar(boolean useCache, String spider, LoadConfigCallback callback) {
-        String[] urls = spider.split(";md5;");
-        String jarUrl = urls[0];
-        String md5 = urls.length > 1 ? urls[1].trim() : "";
-        File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
-
-        if (!md5.isEmpty() || useCache) {
-            if (cache.exists() && (useCache || MD5.getFileMd5(cache).equalsIgnoreCase(md5))) {
-                if (jarLoader.load(cache.getAbsolutePath())) {
-                    callback.success();
-                } else {
-                    callback.error("");
-                }
-                return;
-            }
-        }
-
-        OkGo.<File>get(jarUrl).execute(new AbsCallback<File>() {
-
+        spiderManager.loadJar(useCache, spider, new SpiderManager.JarLoadCallback() {
             @Override
-            public File convertResponse(okhttp3.Response response) throws Throwable {
-                File cacheDir = cache.getParentFile();
-                if (!cacheDir.exists())
-                    cacheDir.mkdirs();
-                if (cache.exists()) {
-                    // 可能已被设为只读，先放开写权限再删除以便更新
-                    cache.setWritable(true);
-                    cache.delete();
-                }
-                FileOutputStream fos = new FileOutputStream(cache);
-                fos.write(response.body().bytes());
-                fos.flush();
-                fos.close();
-                // Android 14+：写完并关闭后再设只读，供 DexClassLoader 加载
-                cache.setReadOnly();
-                return cache;
+            public void success() {
+                callback.success();
             }
 
             @Override
-            public void onSuccess(Response<File> response) {
-                if (response.body().exists()) {
-                    if (jarLoader.load(response.body().getAbsolutePath())) {
-                        callback.success();
-                    } else {
-                        callback.error("");
-                    }
-                } else {
-                    callback.error("");
-                }
-            }
-
-            @Override
-            public void onError(Response<File> response) {
-                super.onError(response);
-                callback.error("");
+            public void error(String msg) {
+                callback.error(msg);
             }
         });
     }
 
     private void parseJson(String apiUrl, String jsonStr) {
         JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
-        jsLoader.clear();
+        spiderManager.reset();
         sourceBeanList.clear();
         parseBeanList.clear();
         mHomeSource = null;
@@ -554,26 +507,19 @@ public class ApiConfig {
     }
 
     public Spider getCSP(SourceBean sourceBean) {
-        String api = sourceBean.getApi();
-        if (api != null && (api.endsWith(".js") || api.contains(".js?"))) {
-            return jsLoader.getSpider(sourceBean.getKey(), api, sourceBean.getExt(), sourceBean.getJar());
-        }
-        return jarLoader.getSpider(sourceBean.getKey(), api, sourceBean.getExt());
+        return spiderManager.getSpider(sourceBean);
     }
 
     public Object[] proxyLocal(Map param) {
-        if (param != null && "js".equals(String.valueOf(param.get("do")))) {
-            return jsLoader.proxyInvoke(param);
-        }
-        return jarLoader.proxyInvoke(param);
+        return spiderManager.proxyLocal(param);
     }
 
     public JSONObject jsonExt(String key, LinkedHashMap<String, String> jxs, String url) {
-        return jarLoader.jsonExt(key, jxs, url);
+        return spiderManager.jsonExt(key, jxs, url);
     }
 
     public JSONObject jsonExtMix(String flag, String key, String name, LinkedHashMap<String, HashMap<String, String>> jxs, String url) {
-        return jarLoader.jsonExtMix(flag, key, name, jxs, url);
+        return spiderManager.jsonExtMix(flag, key, name, jxs, url);
     }
 
     public interface LoadConfigCallback {

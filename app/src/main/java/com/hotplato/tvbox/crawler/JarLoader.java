@@ -73,9 +73,16 @@ public class JarLoader {
     }
 
     /**
-     * JAR 爬虫 api 形如 csp_Xxx；.js / http(s) URL 属于 drpy/JS 源，需 JsLoader（本仓库未集成）。
+     * 仅清空已实例化的 Spider 缓存，保留 classLoader（配置重载时由 SpiderManager 调用）。
      */
-    static boolean isJarSpiderApi(String api) {
+    public void clearSpiders() {
+        spiders.clear();
+    }
+
+    /**
+     * JAR 爬虫 api 形如 csp_Xxx；.js / http(s) URL 属于 JS 源，由 JsLoader 处理。
+     */
+    public static boolean isJarSpiderApi(String api) {
         if (api == null || api.isEmpty())
             return false;
         if (api.contains("://") || api.contains("/") || api.contains("\\"))
@@ -90,13 +97,15 @@ public class JarLoader {
         if (spiders.containsKey(key))
             return spiders.get(key);
         if (!isJarSpiderApi(cls)) {
-            // 缓存空实现，避免首页分类循环反复 ClassNotFoundException 刷屏
-            Spider nullSpider = new SpiderNull();
+            Spider nullSpider = new SpiderNull(SpiderFailReason.API_UNSUPPORTED, cls);
             spiders.put(key, nullSpider);
             return nullSpider;
         }
-        if (classLoader == null)
-            return new SpiderNull();
+        if (classLoader == null) {
+            Spider nullSpider = new SpiderNull(SpiderFailReason.JAR_NOT_LOADED, cls);
+            spiders.put(key, nullSpider);
+            return nullSpider;
+        }
         String clsKey = cls.startsWith("csp_") ? cls.substring(4) : cls;
         try {
             Spider sp = (Spider) classLoader.loadClass("com.github.catvod.spider." + clsKey).newInstance();
@@ -105,7 +114,8 @@ public class JarLoader {
             return sp;
         } catch (Throwable th) {
             th.printStackTrace();
-            Spider nullSpider = new SpiderNull();
+            String detail = clsKey + ": " + (th.getMessage() != null ? th.getMessage() : th.getClass().getSimpleName());
+            Spider nullSpider = new SpiderNull(SpiderFailReason.JAR_CLASS_INVALID, detail);
             spiders.put(key, nullSpider);
             return nullSpider;
         }

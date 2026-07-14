@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-TVBox 是一款面向 Android TV / 机顶盒的影视聚合客户端（横屏 `landscape`）。应用通过远程 JSON 配置加载视频源，并支持动态 JAR 爬虫（CatVod CSP）、直播、点播播放与本地 Web 控制服务。
+TVBox 是一款面向 Android TV / 机顶盒的影视聚合客户端（横屏 `landscape`）。应用通过远程 JSON 配置加载视频源，并支持动态 JAR 爬虫（CatVod CSP）与 QuickJS 的 JS 爬虫（`.js` / drpy），以及直播、点播播放与本地 Web 控制服务。
 
 | 项 | 值 |
 |---|---|
@@ -29,7 +29,7 @@ TVBox/
 |---|---|
 | `com.hotplato.tvbox.base` | `App` 入口、`BaseActivity`、`BaseLazyFragment` |
 | `com.hotplato.tvbox.api` | `ApiConfig`：远程配置解析、源/解析/直播管理 |
-| `com.hotplato.tvbox.crawler` | `JarLoader`、`Spider`：动态 JAR 爬虫加载 |
+| `com.hotplato.tvbox.crawler` | `SpiderManager`（双轨门面）、`JarLoader`、`JsLoader` |
 | `com.hotplato.tvbox.ui` | Activity、Fragment、Dialog、Adapter |
 | `com.hotplato.tvbox.player` | 播放控制器、渲染、第三方播放器 |
 | `com.hotplato.tvbox.server` | `ControlManager`、`RemoteServer`：局域网 Web 控制 |
@@ -64,7 +64,7 @@ TVBox/
 
 1. `./gradlew assembleDebug` 编译通过
 2. 若改动 UI：确认横屏布局在 1280×720 设计稿下正常（`AutoSize` + `design_width_in_dp=1280`）
-3. 若改动 `ApiConfig` / 爬虫：确认不在主线程调用 `JarLoader.load()`
+3. 若改动 `ApiConfig` / 爬虫：确认不在主线程调用 `JarLoader.load()` / `SpiderManager` 的 JAR 装载
 4. 若改动播放逻辑：分别验证 IJK（`PLAY_TYPE=1`）与 Exo（`PLAY_TYPE=2`）路径
 5. 若改动 native 库：确认 APK 内包含 `lib/arm64-v8a/libplayer.so` 与 `lib/armeabi-v7a/libplayer.so`
 
@@ -114,9 +114,16 @@ TVBox/
 ### 配置加载流程
 
 1. 用户配置 API 地址（`HawkConfig.API_URL`）
-2. `ApiConfig.load()` 拉取 JSON，解析 `sites`、`parses`、`lives` 等
-3. 若配置含 `spider` JAR，通过 `JarLoader` 用 `DexClassLoader` 动态加载
-4. 各页面通过 `ApiConfig.get()` 获取当前源与解析规则
+2. `ApiConfig.load()` 拉取 JSON，解析 `sites`、`parses`、`lives` 等；重载时 `SpiderManager.reset()`
+3. 若配置含 `spider` JAR，经 `SpiderManager.loadJar` → `JarLoader`（`DexClassLoader`）装载
+4. 各页面通过 `ApiConfig.getCSP()` 取爬虫：`.js` 走 `JsLoader`，`csp_*` 走 `JarLoader`
+
+### Spider 双轨
+
+- 门面：`SpiderManager`（`ApiConfig` 委托），宿主 API 仍为 `com.github.catvod.crawler.Spider`
+- JAR：配置级 `spider` + 站点 `api` 形如 `csp_Xxx`
+- JS：站点 `api` 为 `.js` / `.js?`，可选站点级 `jar`（jsapi）；运行时为 `JsSpider` + `:quickjs`
+- 失败：返回带 `reason` 的 `SpiderNull`，见 `SpiderFailReason`
 
 ### 播放栈
 
@@ -190,7 +197,7 @@ feat(app): 支持配置多个首页推荐源
 ### 新增视频源类型 / 解析逻辑
 
 1. 从 `ApiConfig` 的配置解析入手
-2. 若涉及爬虫接口，对照 `Spider` 抽象类与 `JarLoader` 调用链
+2. 若涉及爬虫接口，对照 `Spider` 抽象类与 `SpiderManager` → `JarLoader` / `JsLoader` 调用链
 3. 播放地址获取失败时检查 `ParseBean` 与 `vipParseFlags`
 
 ### 新增页面
@@ -223,7 +230,9 @@ feat(app): 支持配置多个首页推荐源
 | `app/src/main/java/com/hotplato/tvbox/api/ApiConfig.java` | 配置与源管理核心 |
 | `app/src/main/java/com/hotplato/tvbox/base/App.java` | Application 初始化 |
 | `app/src/main/java/com/hotplato/tvbox/util/HawkConfig.java` | 设置键名 |
+| `app/src/main/java/com/hotplato/tvbox/crawler/SpiderManager.java` | JAR/JS 爬虫统一门面 |
 | `app/src/main/java/com/hotplato/tvbox/crawler/JarLoader.java` | 动态爬虫 JAR 加载 |
+| `app/src/main/java/com/hotplato/tvbox/crawler/JsLoader.java` | JS 爬虫加载（QuickJS） |
 | `app/src/main/AndroidManifest.xml` | 组件注册与权限 |
 | `app/build.gradle` | 应用依赖与构建配置 |
 | `player/build.gradle` | 播放器模块依赖 |
