@@ -34,7 +34,9 @@ fun TvBoxNavGraph(
                 onOpenDetail = { sourceKey, vodId ->
                     navController.navigate(TvBoxRoutes.detail(sourceKey, vodId))
                 },
-                onOpenSearch = { navController.navigate(TvBoxRoutes.SEARCH) },
+                onOpenSearch = { query ->
+                    navController.navigate(TvBoxRoutes.search(query))
+                },
                 onOpenSettings = { navController.navigate(TvBoxRoutes.SETTINGS) },
                 onOpenHistory = { navController.navigate(TvBoxRoutes.HISTORY) },
                 onOpenCollect = { navController.navigate(TvBoxRoutes.COLLECT) },

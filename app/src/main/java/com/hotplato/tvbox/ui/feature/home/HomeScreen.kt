@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Column
@@ -36,7 +35,7 @@ import com.hotplato.tvbox.ui.theme.TvMuted
 @Composable
 fun HomeScreen(
     onOpenDetail: (sourceKey: String, vodId: String) -> Unit,
-    onOpenSearch: () -> Unit,
+    onOpenSearch: (query: String?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCollect: () -> Unit,
@@ -81,7 +80,7 @@ fun HomeScreen(
             TvFocusButton(text = "直播", onClick = {
                 context.startActivity(Intent(context, LivePlayActivity::class.java))
             })
-            TvFocusButton(text = "搜索", onClick = onOpenSearch)
+            TvFocusButton(text = "搜索", onClick = { onOpenSearch(null) })
             TvFocusButton(text = "设置", onClick = onOpenSettings)
             TvFocusButton(text = "历史", onClick = onOpenHistory)
             TvFocusButton(text = "收藏", onClick = onOpenCollect)
@@ -113,9 +112,13 @@ fun HomeScreen(
                 state.loading && state.videos.isEmpty() -> LoadingState()
                 state.error != null && state.videos.isEmpty() ->
                     ErrorState(message = state.error!!, onRetry = { viewModel.bootstrap() })
-                state.sorts.getOrNull(state.selectedSortIndex)?.id == "my0" ->
-                    EmptyState("请从左侧进入历史/收藏等入口")
-                state.videos.isEmpty() -> EmptyState("当前分类暂无内容")
+                state.videos.isEmpty() -> EmptyState(
+                    if (state.sorts.getOrNull(state.selectedSortIndex)?.id == "my0") {
+                        "暂无推荐内容"
+                    } else {
+                        "当前分类暂无内容"
+                    },
+                )
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
                     contentPadding = PaddingValues(4.dp),
@@ -123,15 +126,22 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.videos, key = { "${it.sourceKey}_${it.id}" }) { item ->
+                    itemsIndexed(
+                        state.videos,
+                        key = { index, item -> "${item.sourceKey}_${item.id}_$index" },
+                    ) { _, item ->
                         TvPosterCard(
                             title = item.name ?: "",
                             imageUrl = item.pic,
                             subtitle = item.note,
                             onClick = {
-                                val key = item.sourceKey ?: return@TvPosterCard
-                                val id = item.id ?: return@TvPosterCard
-                                onOpenDetail(key, id)
+                                val key = item.sourceKey
+                                val id = item.id
+                                if (!key.isNullOrBlank() && !id.isNullOrBlank()) {
+                                    onOpenDetail(key, id)
+                                } else if (!item.name.isNullOrBlank()) {
+                                    onOpenSearch(item.name)
+                                }
                             },
                         )
                     }

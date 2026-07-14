@@ -3,20 +3,33 @@ package com.hotplato.tvbox.ui.feature.home
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.bean.AbsSortXml
 import com.hotplato.tvbox.bean.AbsXml
 import com.hotplato.tvbox.bean.Movie
 import com.hotplato.tvbox.bean.MovieSort
 import com.hotplato.tvbox.bean.StoreBean
+import com.hotplato.tvbox.bean.VodInfo
+import com.hotplato.tvbox.cache.RoomDataManger
 import com.hotplato.tvbox.server.ControlManager
 import com.hotplato.tvbox.util.DefaultConfig
+import com.hotplato.tvbox.util.HawkConfig
 import com.hotplato.tvbox.viewmodel.SourceViewModel
+import com.lzy.okgo.OkGo
+import com.lzy.okgo.callback.AbsCallback
+import com.lzy.okgo.model.Response
+import com.orhanobut.hawk.Hawk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class HomeUiState(
@@ -38,6 +51,7 @@ class HomeViewModel : ViewModel() {
     private val dataInitOk = AtomicBoolean(false)
     private val jarInitOk = AtomicBoolean(false)
     private var useCacheConfig = false
+    private var homeSourceRec: List<Movie.Video> = emptyList()
 
     private val sortObserver = Observer<AbsSortXml?> { abs ->
         val homeKey = ApiConfig.get().homeSourceBean?.key ?: ""
@@ -46,6 +60,7 @@ class HomeViewModel : ViewModel() {
             abs?.classes?.sortList ?: ArrayList(),
             true,
         )
+        homeSourceRec = abs?.videoList ?: emptyList()
         _uiState.update {
             it.copy(
                 loading = false,
@@ -53,14 +68,15 @@ class HomeViewModel : ViewModel() {
                 sorts = sorts,
                 homeName = ApiConfig.get().homeSourceBean?.name ?: "",
                 selectedSortIndex = 0,
-                videos = abs?.videoList ?: emptyList(),
+                videos = emptyList(),
             )
         }
-        if (sorts.isNotEmpty()) {
-            val first = sorts[0]
-            if (first.id != "my0") {
-                loadList(first, 1)
-            }
+        if (sorts.isEmpty()) return@Observer
+        val first = sorts[0]
+        if (first.id == "my0") {
+            loadHomeRec()
+        } else {
+            loadList(first, 1)
         }
     }
 
@@ -142,12 +158,8 @@ class HomeViewModel : ViewModel() {
 
     fun selectStore(store: StoreBean) {
         viewModelScope.launch {
-            // selection handled via Hawk in SettingsRepository-compatible flow
-            com.orhanobut.hawk.Hawk.put(com.hotplato.tvbox.util.HawkConfig.STORE_API, store.url)
-            com.orhanobut.hawk.Hawk.put(
-                com.hotplato.tvbox.util.HawkConfig.STORE_NAME,
-                store.name ?: "",
-            )
+            Hawk.put(HawkConfig.STORE_API, store.url)
+            Hawk.put(HawkConfig.STORE_NAME, store.name ?: "")
             bootstrap(false)
         }
     }
@@ -155,10 +167,10 @@ class HomeViewModel : ViewModel() {
     fun selectSort(index: Int) {
         val sorts = _uiState.value.sorts
         if (index !in sorts.indices) return
-        _uiState.update { it.copy(selectedSortIndex = index, loading = true, page = 1) }
+        _uiState.update { it.copy(selectedSortIndex = index, loading = true, page = 1, videos = emptyList()) }
         val sort = sorts[index]
         if (sort.id == "my0") {
-            _uiState.update { it.copy(loading = false, videos = emptyList()) }
+            loadHomeRec()
             return
         }
         loadList(sort, 1)
@@ -168,7 +180,104 @@ class HomeViewModel : ViewModel() {
         sourceViewModel.getList(sort, page)
     }
 
+    /** 对齐遗留 UserFragment：0 豆瓣热播 / 1 数据源推荐 / 2 历史记录 */
+    private fun loadHomeRec() {
+        when (Hawk.get(HawkConfig.HOME_REC, 0)) {
+            1 -> {
+                _uiState.update {
+                    it.copy(loading = false, videos = homeSourceRec, error = null)
+                }
+            }
+            2 -> {
+                viewModelScope.launch(Dispatchers.IO) {
+                    val vodList = RoomDataManger.getAllVodRecord(10).map { toVideo(it) }
+                    _uiState.update {
+                        it.copy(loading = false, videos = vodList, error = null)
+                    }
+                }
+            }
+            else -> loadDoubanHot()
+        }
+    }
+
+    private fun loadDoubanHot() {
+        try {
+            val cal = Calendar.getInstance()
+            val year = cal.get(Calendar.YEAR)
+            val month = cal.get(Calendar.MONTH) + 1
+            val day = cal.get(Calendar.DATE)
+            val today = String.format("%d%d%d", year, month, day)
+            val requestDay = Hawk.get("home_hot_day", "")
+            if (requestDay == today) {
+                val json = Hawk.get("home_hot", "")
+                if (!json.isNullOrEmpty()) {
+                    _uiState.update {
+                        it.copy(loading = false, videos = parseDoubanHots(json), error = null)
+                    }
+                    return
+                }
+            }
+            OkGo.get<String>(
+                "https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=&playable=1&start=0&year_range=$year,$year",
+            ).tag("home_hot").execute(object : AbsCallback<String>() {
+                override fun onSuccess(response: Response<String>) {
+                    val netJson = response.body() ?: ""
+                    Hawk.put("home_hot_day", today)
+                    Hawk.put("home_hot", netJson)
+                    _uiState.update {
+                        it.copy(loading = false, videos = parseDoubanHots(netJson), error = null)
+                    }
+                }
+
+                override fun convertResponse(response: okhttp3.Response): String {
+                    return response.body()!!.string()
+                }
+
+                override fun onError(response: Response<String>) {
+                    super.onError(response)
+                    _uiState.update {
+                        it.copy(loading = false, videos = emptyList(), error = null)
+                    }
+                }
+            })
+        } catch (th: Throwable) {
+            th.printStackTrace()
+            _uiState.update { it.copy(loading = false, videos = emptyList(), error = null) }
+        }
+    }
+
+    private fun parseDoubanHots(json: String): List<Movie.Video> {
+        val result = ArrayList<Movie.Video>()
+        try {
+            val infoJson = Gson().fromJson(json, JsonObject::class.java) ?: return result
+            val array: JsonArray = infoJson.getAsJsonArray("data") ?: return result
+            for (ele: JsonElement in array) {
+                val obj = ele as JsonObject
+                val vod = Movie.Video()
+                vod.name = obj.get("title")?.asString
+                vod.note = obj.get("rate")?.asString
+                vod.pic = obj.get("cover")?.asString
+                result.add(vod)
+            }
+        } catch (_: Throwable) {
+        }
+        return result
+    }
+
+    private fun toVideo(vodInfo: VodInfo): Movie.Video {
+        val vod = Movie.Video()
+        vod.id = vodInfo.id
+        vod.sourceKey = vodInfo.sourceKey
+        vod.name = vodInfo.name
+        vod.pic = vodInfo.pic
+        if (!vodInfo.playNote.isNullOrEmpty()) {
+            vod.note = "上次看到${vodInfo.playNote}"
+        }
+        return vod
+    }
+
     override fun onCleared() {
+        OkGo.getInstance().cancelTag("home_hot")
         sourceViewModel.sortResult.removeObserver(sortObserver)
         sourceViewModel.listResult.removeObserver(listObserver)
         super.onCleared()
