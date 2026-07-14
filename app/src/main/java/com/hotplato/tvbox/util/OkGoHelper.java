@@ -105,7 +105,8 @@ public class OkGoHelper {
         dispatcher.setMaxRequestsPerHost(16);
         builder.dispatcher(dispatcher);
 
-        builder.dns(dnsOverHttps);
+        // DoH 关闭时 dnsOverHttps 仍委托 SYSTEM；统一套 PreferIpv4，避免 fake-ip AAAA 抢先失败
+        builder.dns(new PreferIpv4Dns(dnsOverHttps != null ? dnsOverHttps : okhttp3.Dns.SYSTEM));
         try {
             setOkHttpSsl(builder);
         } catch (Throwable th) {
@@ -119,6 +120,7 @@ public class OkGoHelper {
 
         initPicasso(okHttpClient);
         initCoil(okHttpClient);
+        ImageHostRewrite.prefetch();
     }
 
     static void initPicasso(OkHttpClient client) {

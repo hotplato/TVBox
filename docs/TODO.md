@@ -10,9 +10,46 @@
 - **范围**：去掉 `force` 升级到 OkHttp 4.x；适配 `OkGoHelper`、DoH、图片加载；评估是否改用 Media3 OkHttp DataSource。
 - **说明**：不并入「Media3 + 去 DK 壳」播放器改造；播放期仍用 Media3 `DefaultHttpDataSource`。
 
+### 详情页选集不可见
+
+- **现象**：海报 + 线路占满首屏，选集在下方被裁切；焦点可盲进播放，但屏上看不到选集按钮。
+- **方向**：`DetailScreen` 外层 `Column` 不可滚，底部 `LazyVerticalGrid` 用 `fillMaxSize()` 不当；改为 `weight(1f)` 或整页可滚。
+
+### 详情简介 HTML 实体未解码
+
+- **现象**：简介出现字面量 `&nbsp;`、`&#13;&#10;` 等。
+- **方向**：遗留 `DetailActivity` 用 `Html.fromHtml`，Compose `DetailScreen` 直接 `Text` 未解码。
+
+### 首页豆瓣热播点进走搜索中转
+
+- **现象**：点击首页推荐先到同名搜索，再选手动进详情；搜索结果封面也失败。
+- **根因**：`HomeViewModel.parseDoubanHots` 只填 `name/note/pic`，无 `id`/`sourceKey`，`HomeScreen` 回退 `onOpenSearch(name)`。
+- **方向**：补齐可播映射，或明确「搜同名」交互并优化体验。
+
+### 直播秒退：频道列表为空
+
+- **现象**：进 `LivePlayActivity` 后 Toast「频道列表为空」并 `finish()`。
+- **说明**：更像当前配置无可用 `lives`；需确认配置解析与空态提示/引导。
+
+### EventBus 事件在 Compose 侧无订阅
+
+- **现象**：log 出现 `ServerEvent` / `RefreshEvent` 无订阅方。
+- **方向**：经 `EventBusBridge` 接入 Compose，或清理不再需要的投递。
+
+### JAR 相对路径 `./xxx` 装载失败
+
+- **现象**：`JarLoader.load` 尝试 `/storage/emulated/0/TVBox/./ogthread.json` 报 `FileNotFoundException`。
+- **方向**：规范化站点级 jar / 资源相对路径解析。
+
 ---
 
 ## 已完成
+
+### 源站封面加载失败（分类 / 搜索 / 详情）
+
+- **根因**：① 荐片 JAR 仍输出已 NXDOMAIN 的图床 `static.ztcuc.com`；② fake-ip 环境下 AAAA=`fc00::` 优先导致连接失败。
+- **修复**：`ImageHostRewrite` 按荐片官方链路刷新 `imgDomain` 并改写失效 host；`PreferIpv4Dns` 优先 IPv4 并丢弃 ULA IPv6；接入 `ImageHttpHeaders`（Coil / Picasso 共用）。
+- **验证**：`emulator-5554` 电影分类封面恢复。
 
 ### 启动慢：JAR 主线程装载
 

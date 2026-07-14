@@ -31,7 +31,7 @@ public final class ImageHttpHeaders {
 
     @NonNull
     public static Request apply(@NonNull Request request) {
-        String url = request.url().toString();
+        String url = ImageHostRewrite.apply(request.url().toString());
         String header = null;
         String cookie = null;
         String ua = null;
