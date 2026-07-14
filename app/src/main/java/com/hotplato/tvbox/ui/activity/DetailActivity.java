@@ -268,7 +268,7 @@ public class DetailActivity extends BaseActivity {
             insertVod(sourceKey, vodInfo);
             bundle.putString("sourceKey", sourceKey);
             bundle.putSerializable("VodInfo", vodInfo);
-            jumpActivity(PlayActivity.class, bundle);
+            jumpActivity(com.hotplato.tvbox.ui.play.PlayActivity.class, bundle);
         }
     }
 

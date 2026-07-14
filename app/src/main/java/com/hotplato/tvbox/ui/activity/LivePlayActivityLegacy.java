@@ -60,7 +60,7 @@ import xyz.doikki.videoplayer.player.VideoView;
  * @date :2021/1/12
  * @description:
  */
-public class LivePlayActivity extends BaseActivity {
+public class LivePlayActivityLegacy extends BaseActivity {
     private VideoView mVideoView;
     private TextView tvChannelInfo;
     private TextView tvTime;
@@ -810,7 +810,7 @@ public class LivePlayActivity extends BaseActivity {
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        LivePlayActivity.this.showSuccess();
+                        LivePlayActivityLegacy.this.showSuccess();
                         initLiveState();
                     }
                 });

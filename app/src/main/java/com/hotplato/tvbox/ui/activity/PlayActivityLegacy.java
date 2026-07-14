@@ -84,7 +84,7 @@ import me.jessyan.autosize.AutoSize;
 import xyz.doikki.videoplayer.player.ProgressManager;
 import xyz.doikki.videoplayer.player.VideoView;
 
-public class PlayActivity extends BaseActivity {
+public class PlayActivityLegacy extends BaseActivity {
     private VideoView mVideoView;
     private TextView mPlayLoadTip;
     private ImageView mPlayLoadErr;
@@ -155,14 +155,14 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void playNext(boolean rmProgress) {
                 String preProgressKey = progressKey;
-                PlayActivity.this.playNext();
+                PlayActivityLegacy.this.playNext();
                 if (rmProgress && preProgressKey != null)
                     CacheManager.delete(MD5.string2MD5(preProgressKey), 0);
             }
 
             @Override
             public void playPre() {
-                PlayActivity.this.playPrevious();
+                PlayActivityLegacy.this.playPrevious();
             }
 
             @Override
@@ -237,11 +237,11 @@ public class PlayActivity extends BaseActivity {
                                 boolean callResult = false;
                                 switch (playerType) {
                                     case 10: {
-                                        callResult = MXPlayer.run(PlayActivity.this, url, playTitle, playSubtitle, headers);
+                                        callResult = MXPlayer.run(PlayActivityLegacy.this, url, playTitle, playSubtitle, headers);
                                         break;
                                     }
                                     case 11: {
-                                        callResult = ReexPlayer.run(PlayActivity.this, url, playTitle, playSubtitle, headers);
+                                        callResult = ReexPlayer.run(PlayActivityLegacy.this, url, playTitle, playSubtitle, headers);
                                         break;
                                     }
                                 }
@@ -877,7 +877,7 @@ public class PlayActivity extends BaseActivity {
         public void setOverScrollMode(int mode) {
             super.setOverScrollMode(mode);
             if (mContext instanceof Activity)
-                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, PlayActivity.this);
+                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, PlayActivityLegacy.this);
         }
 
         @Override
@@ -895,7 +895,7 @@ public class PlayActivity extends BaseActivity {
         public void setOverScrollMode(int mode) {
             super.setOverScrollMode(mode);
             if (mContext instanceof Activity)
-                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, PlayActivity.this);
+                AutoSize.autoConvertDensityOfCustomAdapt((Activity) mContext, PlayActivityLegacy.this);
         }
 
         @Override

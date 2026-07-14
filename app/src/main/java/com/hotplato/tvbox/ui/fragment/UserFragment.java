@@ -17,7 +17,7 @@ import com.hotplato.tvbox.event.ServerEvent;
 import com.hotplato.tvbox.ui.activity.CollectActivity;
 import com.hotplato.tvbox.ui.activity.DetailActivity;
 import com.hotplato.tvbox.ui.activity.HistoryActivity;
-import com.hotplato.tvbox.ui.activity.LivePlayActivity;
+import com.hotplato.tvbox.ui.live.LivePlayActivity;
 import com.hotplato.tvbox.ui.activity.PushActivity;
 import com.hotplato.tvbox.ui.activity.SearchActivity;
 import com.hotplato.tvbox.ui.activity.SettingActivity;

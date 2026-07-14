@@ -26,7 +26,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".ui.activity.HomeActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:screenOrientation="landscape">
             <intent-filter>
@@ -38,13 +38,13 @@
         </activity>
 
         <activity
-            android:name=".ui.activity.LivePlayActivity"
+            android:name=".ui.live.LivePlayActivity"
             android:screenOrientation="landscape" />
         <activity
             android:name=".ui.activity.DetailActivity"
             android:screenOrientation="landscape" />
         <activity
-            android:name=".ui.activity.PlayActivity"
+            android:name=".ui.play.PlayActivity"
             android:screenOrientation="landscape" />
         <activity
             android:name=".ui.activity.PushActivity"
@@ -60,6 +60,11 @@
             android:screenOrientation="landscape" />
         <activity
             android:name=".ui.activity.CollectActivity"
+            android:screenOrientation="landscape" />
+        <!-- Legacy home retained for debug comparison; not a launcher. -->
+        <activity
+            android:name=".ui.activity.HomeActivity"
+            android:exported="false"
             android:screenOrientation="landscape" />
 
         <receiver

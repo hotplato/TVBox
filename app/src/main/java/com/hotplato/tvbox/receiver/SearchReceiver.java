@@ -4,11 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-import com.hotplato.tvbox.event.ServerEvent;
-import com.hotplato.tvbox.ui.activity.SearchActivity;
-import com.hotplato.tvbox.util.AppManager;
-
-import org.greenrobot.eventbus.EventBus;
+import com.hotplato.tvbox.ui.MainActivity;
 
 /**
  * @author pj567
@@ -21,15 +17,11 @@ public class SearchReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (action.equals(intent.getAction()) && intent.getExtras() != null) {
-            if (AppManager.getInstance().getActivity(SearchActivity.class) != null) {
-                AppManager.getInstance().backActivity(SearchActivity.class);
-                EventBus.getDefault().post(new ServerEvent(ServerEvent.SERVER_SEARCH, intent.getExtras().getString("title")));
-            } else {
-                Intent newIntent = new Intent(context, SearchActivity.class);
-                newIntent.putExtra("title", intent.getExtras().getString("title"));
-                newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                context.startActivity(newIntent);
-            }
+            Intent newIntent = new Intent(context, MainActivity.class);
+            newIntent.putExtra(MainActivity.EXTRA_ROUTE, MainActivity.ROUTE_SEARCH);
+            newIntent.putExtra(MainActivity.EXTRA_QUERY, intent.getExtras().getString("title"));
+            newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            context.startActivity(newIntent);
         }
     }
 }

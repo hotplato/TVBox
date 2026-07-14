@@ -8,10 +8,11 @@ TVBox 是一款面向 Android TV / 机顶盒的影视聚合客户端（横屏 `l
 
 | 项 | 值 |
 |---|---|
-| 语言 | Java 17 |
-| 构建 | Gradle 8.9 + Android Gradle Plugin 8.5.2 |
-| `compileSdk` / `targetSdk` | 34 / 34 |
-| `minSdk` | 21 |
+| 语言 | Kotlin（UI）+ Java 17（业务/播放/爬虫） |
+| UI | Jetpack Compose + Compose for TV（`androidx.tv`） |
+| 构建 | Gradle 8.9 + Android Gradle Plugin 8.7.2 + Kotlin 2.0.21 |
+| `compileSdk` / `targetSdk` | 35 / 34 |
+| `minSdk` | 23（Compose for TV 要求） |
 | 包名 | `com.hotplato.tvbox` |
 | ABI | `armeabi-v7a` + `arm64-v8a` |
 
@@ -27,16 +28,18 @@ TVBox/
 
 | 包路径 | 职责 |
 |---|---|
-| `com.hotplato.tvbox.base` | `App` 入口、`BaseActivity`、`BaseLazyFragment` |
-| `com.hotplato.tvbox.api` | `ApiConfig`：远程配置解析、源/解析/直播管理 |
-| `com.hotplato.tvbox.crawler` | `SpiderManager`（双轨门面）、`JarLoader`、`JsLoader` |
-| `com.hotplato.tvbox.ui` | Activity、Fragment、Dialog、Adapter |
+| `com.hotplato.tvbox.base` | `App` 入口；遗留 `BaseActivity` / `BaseLazyFragment` |
+| `com.hotplato.tvbox.api` | `ApiConfig`：远程配置解析、源/解析/直播管理（Java） |
+| `com.hotplato.tvbox.crawler` | `SpiderManager`（双轨门面）、`JarLoader`、`JsLoader`（Java） |
+| `com.hotplato.tvbox.ui` | Compose UI：`MainActivity`、`theme`、`feature/*`、`navigation` |
+| `com.hotplato.tvbox.ui.play` / `ui.live` | 播放 Compose 外壳 + Legacy View 树（`AndroidView`/叠加） |
+| `com.hotplato.tvbox.data` | Kotlin Repository / `SettingsRepository` / `EventBusBridge` |
 | `com.hotplato.tvbox.player` | 播放控制器、渲染、第三方播放器 |
 | `com.hotplato.tvbox.server` | `ControlManager`、`RemoteServer`：局域网 Web 控制 |
 | `com.hotplato.tvbox.cache` | Room 数据库与 DAO |
 | `com.hotplato.tvbox.bean` | 数据模型（`SourceBean`、`VodInfo` 等） |
 | `com.hotplato.tvbox.util` | 工具类；`HawkConfig` 为配置键常量 |
-| `com.hotplato.tvbox.event` | EventBus 事件定义 |
+| `com.hotplato.tvbox.event` | EventBus 事件定义（Compose 经 `EventBusBridge` 接入） |
 
 ### 关键单例
 
@@ -58,12 +61,12 @@ TVBox/
 ./gradlew clean
 ```
 
-**环境要求**：Android SDK（`compileSdk 34`）、JDK 17、Android NDK（编译 IJK 原生库时）。`local.properties` 需配置 `sdk.dir`，该文件已 gitignore，勿提交。
+**环境要求**：Android SDK（`compileSdk 35`）、JDK 17、Android NDK（编译 IJK 原生库时）。`local.properties` 需配置 `sdk.dir`，该文件已 gitignore，勿提交。
 
 **验证清单**（修改后尽量执行）：
 
 1. `./gradlew assembleDebug` 编译通过
-2. 若改动 UI：确认横屏布局在 1280×720 设计稿下正常（`AutoSize` + `design_width_in_dp=1280`）
+2. 若改动 UI：确认横屏布局在 1280×720 设计稿下正常（Compose 用 `Dp`；遗留 XML 仍可能走 AutoSize）
 3. 若改动 `ApiConfig` / 爬虫：确认不在主线程调用 `JarLoader.load()` / `SpiderManager` 的 JAR 装载
 4. 若改动播放逻辑：分别验证 IJK（`PLAY_TYPE=1`）与 Exo（`PLAY_TYPE=2`）路径
 5. 若改动 native 库：确认 APK 内包含 `lib/arm64-v8a/libplayer.so` 与 `lib/armeabi-v7a/libplayer.so`
@@ -87,27 +90,27 @@ TVBox/
 
 ### 遵循现有模式
 
-- **Java only**，不使用 Kotlin
-- Activity 继承 `BaseActivity`，Fragment 继承 `BaseLazyFragment`
-- Dialog 继承 `BaseDialog`
-- RecyclerView Adapter 使用 `BaseQuickAdapter`（BRVAH）
-- 页面状态用 LoadSir（`EmptyCallback`、`LoadingCallback`）
-- 跨组件通信优先 **EventBus**（`com.hotplato.tvbox.event`）
+- **新 UI 用 Kotlin + Jetpack Compose for TV**；业务层（`api` / `crawler` / `cache` / `server`）本阶段保持 Java
+- 宿主：`MainActivity` + Navigation-Compose；播放/直播为独立 Activity（Compose 外壳 + 遗留播放表面）
+- Screen 只消费 `UiState`；Hawk 经 `SettingsRepository`；EventBus 经 `EventBusBridge`，Compose 内不要直接 `@Subscribe`
+- 遗留 XML 页仍可：`BaseActivity` / `BaseLazyFragment` / `BaseDialog` / BRVAH / LoadSir
 - 网络请求：**OkGo**（`OkGoHelper` 初始化）或 **OkHttp**
 - JSON 解析：**Gson**
-- 新建设置项：在 `HawkConfig` 添加常量，通过 `Hawk` 读写
+- 图片（Compose）：**Coil**；遗留 Picasso 随 XML 退场
+- 新建设置项：在 `HawkConfig` 添加常量，经 `SettingsRepository` / `Hawk` 读写
+- Room 注解处理用 **KSP**
 
 ### 命名与结构
 
 - 保持现有包划分，不要把业务逻辑堆进 `util`
-- Bean 放 `bean/`，DAO 放 `cache/`，UI 放 `ui/` 对应子包
+- Bean 放 `bean/`，DAO 放 `cache/`，Compose 功能页放 `ui/feature/<name>/`
 - 单例使用双重检查锁定，与 `ApiConfig`、`ControlManager` 一致
 
 ### UI 注意
 
 - 所有 Activity 强制横屏（`AndroidManifest.xml`）
-- TV 遥控器焦点导航：修改列表/按钮时保留焦点态 drawable（如 `*_focus.xml`）
-- 尺寸适配走 `me.jessyan.autosize`，不要硬编码 dp 替代已有适配方案
+- Compose TV：`androidx.tv:tv-material` + Compose Foundation Lazy；焦点组件复用 `TvFocusButton` / `TvPosterCard`
+- Compose 树不以 AutoSize 为准；设计宽 1280dp 横屏
 
 ## 架构要点
 
@@ -127,7 +130,7 @@ TVBox/
 
 ### 播放栈
 
-`player` 模块封装 IJK、ExoPlayer、DKPlayer。`app` 中 `PlayerHelper` 根据 `HawkConfig.PLAY_TYPE` 选择播放器。修改播放相关代码时同时检查 `PlayActivity`、`LivePlayActivity` 与 `player/` 模块。
+`player` 模块封装 IJK、ExoPlayer、DKPlayer。`app` 中 `PlayerHelper` 根据 `HawkConfig.PLAY_TYPE` 选择播放器。修改播放相关代码时同时检查 `ui.play.PlayActivity`、`ui.live.LivePlayActivity`（及其 Legacy）、`player/` 模块。
 
 ### 本地服务
 
@@ -177,7 +180,7 @@ feat(app): 支持配置多个首页推荐源
 
 ## 边界与禁止事项
 
-- **不要**擅自降级或升级 AGP / Gradle / `compileSdk`，除非用户明确要求
+- **不要**擅自降级或升级 AGP / Gradle / `compileSdk`，除非用户明确要求（当前因 Compose for TV 已升至 AGP 8.7.2 / `compileSdk` 35 / `minSdk` 23）
 - **不要**修改 `app/libs/thunder.jar` 或随意替换 `player/jniLibs` 下已验证的 `.so`，除非有明确的兼容性测试
 - **不要**提交 `local.properties`、`.gradle/`、`build/`、`*.apk`
 - **不要**在主线程执行 `JarLoader.load()`、网络 IO、数据库批量操作
