@@ -436,7 +436,13 @@ public class SourceViewModel extends ViewModel {
                         ids.add(id);
                         json(detailResult, sp.detailContent(ids), sourceBean.getKey());
                     } catch (Throwable th) {
+                        Throwable cause = th.getCause() != null ? th.getCause() : th;
+                        LOG.i("getDetail failed key=" + sourceKey + " id=" + id
+                                + " err=" + th.getClass().getSimpleName()
+                                + " cause=" + cause.getClass().getSimpleName()
+                                + ": " + cause.getMessage());
                         th.printStackTrace();
+                        detailResult.postValue(null);
                     }
                 }
             });
