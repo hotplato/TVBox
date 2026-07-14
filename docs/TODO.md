@@ -10,11 +10,6 @@
 - **范围**：去掉 `force` 升级到 OkHttp 4.x；适配 `OkGoHelper`、DoH、图片加载；评估是否改用 Media3 OkHttp DataSource。
 - **说明**：不并入「Media3 + 去 DK 壳」播放器改造；播放期仍用 Media3 `DefaultHttpDataSource`。
 
-### 详情简介 HTML 实体未解码
-
-- **现象**：简介出现字面量 `&nbsp;`、`&#13;&#10;` 等。
-- **方向**：遗留 `DetailActivity` 用 `Html.fromHtml`，Compose `DetailScreen` 直接 `Text` 未解码。
-
 ### 首页豆瓣热播点进走搜索中转
 
 - **现象**：点击首页推荐先到同名搜索，再选手动进详情；搜索结果封面也失败。
@@ -39,6 +34,11 @@
 ---
 
 ## 已完成
+
+### 详情简介 HTML 实体未解码
+
+- **根因**：遗留 `DetailActivity` 用 `Html.fromHtml`，Compose `DetailScreen` 直接 `Text` 未解码。
+- **修复**：`htmlToPlainText`（`HtmlCompat`）剥离标签并解码实体后再展示。
 
 ### 详情页选集不可见
 

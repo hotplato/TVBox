@@ -34,6 +34,7 @@ import com.hotplato.tvbox.ui.component.TvFocusButton
 import com.hotplato.tvbox.ui.component.VodCoverImage
 import com.hotplato.tvbox.ui.play.PlayActivity
 import com.hotplato.tvbox.ui.theme.TvMuted
+import com.hotplato.tvbox.ui.util.htmlToPlainText
 
 @Composable
 fun DetailScreen(
@@ -106,7 +107,7 @@ fun DetailScreen(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = (info.des ?: "").take(240),
+                            text = htmlToPlainText(info.des).take(240),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
