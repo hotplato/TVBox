@@ -1,5 +1,8 @@
 package com.hotplato.tvbox.crawler;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
 import com.hotplato.tvbox.base.App;
@@ -19,6 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * JAR / JS 爬虫统一门面：分流、生命周期与失败可观测。
@@ -28,6 +33,12 @@ public class SpiderManager {
     private final JarLoader jarLoader = new JarLoader();
     private final JsLoader jsLoader = new JsLoader();
     private final Set<String> loggedNullKeys = ConcurrentHashMap.newKeySet();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService jarLoadExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "jar-load");
+        t.setPriority(Thread.NORM_PRIORITY);
+        return t;
+    });
 
     public interface JarLoadCallback {
         void success();
@@ -68,17 +79,21 @@ public class SpiderManager {
         String md5 = urls.length > 1 ? urls[1].trim() : "";
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
 
-        if (!md5.isEmpty() || useCache) {
-            if (cache.exists() && (useCache || MD5.getFileMd5(cache).equalsIgnoreCase(md5))) {
-                if (jarLoader.load(cache.getAbsolutePath())) {
-                    callback.success();
+        if ((!md5.isEmpty() || useCache) && cache.exists()) {
+            jarLoadExecutor.execute(() -> {
+                if (useCache || MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
+                    loadJarAndPost(cache.getAbsolutePath(), callback);
                 } else {
-                    callback.error("");
+                    mainHandler.post(() -> downloadJar(jarUrl, cache, callback));
                 }
-                return;
-            }
+            });
+            return;
         }
 
+        downloadJar(jarUrl, cache, callback);
+    }
+
+    private void downloadJar(String jarUrl, File cache, JarLoadCallback callback) {
         OkGo.<File>get(jarUrl).execute(new AbsCallback<File>() {
 
             @Override
@@ -100,12 +115,8 @@ public class SpiderManager {
 
             @Override
             public void onSuccess(Response<File> response) {
-                if (response.body().exists()) {
-                    if (jarLoader.load(response.body().getAbsolutePath())) {
-                        callback.success();
-                    } else {
-                        callback.error("");
-                    }
+                if (response.body() != null && response.body().exists()) {
+                    loadJarOnBackground(response.body().getAbsolutePath(), callback);
                 } else {
                     callback.error("");
                 }
@@ -114,6 +125,23 @@ public class SpiderManager {
             @Override
             public void onError(Response<File> response) {
                 super.onError(response);
+                callback.error("");
+            }
+        });
+    }
+
+    /** DexClassLoader / Init 必须在后台；结果回调切回主线程。 */
+    private void loadJarOnBackground(String path, JarLoadCallback callback) {
+        jarLoadExecutor.execute(() -> loadJarAndPost(path, callback));
+    }
+
+    private void loadJarAndPost(String path, JarLoadCallback callback) {
+        boolean ok = jarLoader.load(path);
+        LOG.i("SpiderManager", "JarLoader.load thread=" + Thread.currentThread().getName() + " ok=" + ok);
+        mainHandler.post(() -> {
+            if (ok) {
+                callback.success();
+            } else {
                 callback.error("");
             }
         });
