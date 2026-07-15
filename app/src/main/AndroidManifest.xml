@@ -41,30 +41,7 @@
             android:name=".ui.live.LivePlayActivity"
             android:screenOrientation="landscape" />
         <activity
-            android:name=".ui.activity.DetailActivity"
-            android:screenOrientation="landscape" />
-        <activity
             android:name=".ui.play.PlayActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".ui.activity.PushActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".ui.activity.SearchActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".ui.activity.SettingActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".ui.activity.HistoryActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".ui.activity.CollectActivity"
-            android:screenOrientation="landscape" />
-        <!-- Legacy home retained for debug comparison; not a launcher. -->
-        <activity
-            android:name=".ui.activity.HomeActivity"
-            android:exported="false"
             android:screenOrientation="landscape" />
 
         <receiver

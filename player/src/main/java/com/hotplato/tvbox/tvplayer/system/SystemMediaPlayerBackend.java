@@ -39,6 +39,7 @@ public final class SystemMediaPlayerBackend implements PlayerBackend {
     private int scaleType = TvPlayer.SCREEN_SCALE_DEFAULT;
     private boolean prepared;
     private boolean playWhenReady;
+    private int bufferedPercentage;
 
     public SystemMediaPlayerBackend(Context context, FrameLayout container, int renderType) {
         this.appContext = context.getApplicationContext();
@@ -117,6 +118,7 @@ public final class SystemMediaPlayerBackend implements PlayerBackend {
         releasePlayerOnly();
         prepared = false;
         playWhenReady = true;
+        bufferedPercentage = 0;
         mediaPlayer = new MediaPlayer();
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         mediaPlayer.setOnPreparedListener(mp -> {
@@ -150,6 +152,9 @@ public final class SystemMediaPlayerBackend implements PlayerBackend {
                 listener.onInfoPlaying();
             }
             return false;
+        });
+        mediaPlayer.setOnBufferingUpdateListener((mp, percent) -> {
+            bufferedPercentage = Math.max(0, Math.min(100, percent));
         });
         try {
             Map<String, String> hdr = headers == null ? new HashMap<>() : new HashMap<>(headers);
@@ -223,7 +228,7 @@ public final class SystemMediaPlayerBackend implements PlayerBackend {
 
     @Override
     public int getBufferedPercentage() {
-        return 0;
+        return bufferedPercentage;
     }
 
     @Override
@@ -342,6 +347,7 @@ public final class SystemMediaPlayerBackend implements PlayerBackend {
 
     private void releasePlayerOnly() {
         prepared = false;
+        bufferedPercentage = 0;
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.reset();

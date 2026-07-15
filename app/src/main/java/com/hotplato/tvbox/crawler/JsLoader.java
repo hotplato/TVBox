@@ -31,17 +31,20 @@ import okhttp3.Response;
 public class JsLoader {
     private static final ConcurrentHashMap<String, Spider> spiders = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Class<?>> classes = new ConcurrentHashMap<>();
-    //当前的Js爬虫key
-    private volatile String recentKey = "";
-
     public static void destroy() {
         for (Spider spider : spiders.values()){
-            spider.cancelByTag();
-            spider.destroy();
+            destroyQuietly(spider);
         }
+        spiders.clear();
+        classes.clear();
         SpiderRuntime.reset();
     }
     public void clear() {
+        // Clearing the map alone leaves each JsSpider's QuickJS context and executor alive.
+        // A configuration reload is a lifecycle boundary, so actively destroy old instances.
+        for (Spider spider : spiders.values()) {
+            destroyQuietly(spider);
+        }
         spiders.clear();
         classes.clear();
     }
@@ -109,16 +112,17 @@ public class JsLoader {
                 }
             }
         }
+        File temporary = new File(cache.getParentFile(), cache.getName() + ".download");
         try {
             File parent = cache.getParentFile();
             if (parent != null && !parent.exists()) {
                 //noinspection ResultOfMethodCallIgnored
                 parent.mkdirs();
             }
-            JarMd5Index.delete(cache);
             Response response = OkGo.<File>get(jar).execute();
+            if (response.body() == null) return null;
             InputStream is = response.body().byteStream();
-            OutputStream os = new FileOutputStream(cache);
+            OutputStream os = new FileOutputStream(temporary);
             try {
                 byte[] buffer = new byte[2048];
                 int length;
@@ -133,13 +137,30 @@ public class JsLoader {
                     e.printStackTrace();
                 }
             }
+            if (!md5.isEmpty() && !MD5.getFileMd5(temporary).equalsIgnoreCase(md5)) {
+                temporary.delete();
+                LOG.i("JSLoader", "jsapi md5 mismatch, keeping previous cache");
+                return null;
+            }
+            if (cache.exists() && !cache.delete()) {
+                temporary.delete();
+                return null;
+            }
+            if (!temporary.renameTo(cache)) {
+                temporary.delete();
+                return null;
+            }
+            cache.setReadOnly();
             if (!md5.isEmpty()) {
                 JarMd5Index.write(cache, md5);
+            } else {
+                JarMd5Index.write(cache, MD5.getFileMd5(cache));
             }
             loadClassLoader(cache.getAbsolutePath(), key);
             return classes.get(key);
         } catch (Throwable e) {
             e.printStackTrace();
+            temporary.delete();
         }
         return null;
     }
@@ -166,7 +187,6 @@ public class JsLoader {
             String jarMd5 = urls.length > 1 ? urls[1].trim() : "";
             classLoader = loadJarInternal(jarUrl, jarMd5, jarKey);
         }
-        recentKey = key;
         try {
             Log.i("JSLoader", "echo-createSpider load");
             Spider sp = new JsSpider(key, api, classLoader);
@@ -181,12 +201,34 @@ public class JsLoader {
 
     public Object[] proxyInvoke(Map<String, String> params) {
         try {
-            Spider proxyFun = spiders.get(recentKey);
+            Spider proxyFun = findProxySpider(params);
             if (proxyFun != null) {
                 return proxyFun.proxyLocal(params);
             }
         } catch (Throwable th) {
         }
         return null;
+    }
+
+    /**
+     * Proxy calls may run concurrently with normal spider creation.  Routing by the
+     * last-created spider made those requests nondeterministic.  New proxy URLs can
+     * use site/source/key; old URLs remain supported only when exactly one JS spider
+     * exists, which is the sole unambiguous legacy case.
+     */
+    private Spider findProxySpider(Map<String, String> params) {
+        String key = params.get("site");
+        if (key == null || key.isEmpty()) key = params.get("source");
+        if (key == null || key.isEmpty()) key = params.get("key");
+        if (key != null && !key.isEmpty()) return spiders.get(key);
+        return spiders.size() == 1 ? spiders.values().iterator().next() : null;
+    }
+
+    private static void destroyQuietly(Spider spider) {
+        try {
+            spider.cancelByTag();
+            spider.destroy();
+        } catch (Throwable ignored) {
+        }
     }
 }

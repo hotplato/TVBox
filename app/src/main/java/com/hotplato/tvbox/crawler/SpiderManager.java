@@ -20,6 +20,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -138,23 +139,38 @@ public class SpiderManager {
                 File cacheDir = cache.getParentFile();
                 if (!cacheDir.exists())
                     cacheDir.mkdirs();
-                if (cache.exists()) {
-                    cache.setWritable(true);
-                    cache.delete();
+                if (response.body() == null) throw new IllegalStateException("JAR response body is empty");
+                File temporary = new File(cacheDir, cache.getName() + ".download");
+                long bytes = 0;
+                try (InputStream input = response.body().byteStream();
+                     FileOutputStream output = new FileOutputStream(temporary)) {
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, count);
+                        bytes += count;
+                    }
+                    output.getFD().sync();
+                } catch (Throwable throwable) {
+                    temporary.delete();
+                    throw throwable;
                 }
-                JarMd5Index.delete(cache);
-                FileOutputStream fos = new FileOutputStream(cache);
-                byte[] bytes = response.body().bytes();
-                fos.write(bytes);
-                fos.flush();
-                fos.close();
+                String actualMd5 = MD5.getFileMd5(temporary);
+                if (!md5.isEmpty() && !actualMd5.equalsIgnoreCase(md5)) {
+                    temporary.delete();
+                    throw new IllegalStateException("JAR md5 mismatch");
+                }
+                if (cache.exists() && !cache.delete()) {
+                    temporary.delete();
+                    throw new IllegalStateException("Unable to replace cached JAR");
+                }
+                if (!temporary.renameTo(cache)) {
+                    temporary.delete();
+                    throw new IllegalStateException("Unable to publish downloaded JAR");
+                }
                 cache.setReadOnly();
-                if (!md5.isEmpty()) {
-                    JarMd5Index.write(cache, md5);
-                } else {
-                    JarMd5Index.write(cache, MD5.getFileMd5(cache));
-                }
-                DiagnosticLog.info("Spider", "JAR 下载完成 bytes=" + bytes.length + " md5=" + (!md5.isEmpty()));
+                JarMd5Index.write(cache, md5.isEmpty() ? actualMd5 : md5);
+                DiagnosticLog.info("Spider", "JAR 下载完成 bytes=" + bytes + " md5=" + (!md5.isEmpty()));
                 return cache;
             }
 

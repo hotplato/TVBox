@@ -19,7 +19,7 @@ import okhttp3.Response;
  * 图片请求头处理：剥离 URL 尾部 {@code @Headers}/{@code @Referer} 等扩展，
  * 并为豆瓣图床自动补 Referer，避免 CDN 反爬返回 418。
  * <p>
- * Picasso 与 Coil 共用，避免 Compose 路径漏掉防盗链逻辑。
+ * Compose Coil 图片请求共用，避免防盗链逻辑分散。
  */
 public final class ImageHttpHeaders {
     private static final String DEFAULT_UA =

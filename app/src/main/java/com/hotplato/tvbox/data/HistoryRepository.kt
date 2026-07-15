@@ -13,4 +13,12 @@ object HistoryRepository {
     suspend fun delete(item: VodInfo) = withContext(Dispatchers.IO) {
         RoomDataManger.deleteVodRecord(item.sourceKey, item)
     }
+
+    suspend fun find(sourceKey: String, vodId: String): VodInfo? = withContext(Dispatchers.IO) {
+        RoomDataManger.getVodInfo(sourceKey, vodId)
+    }
+
+    suspend fun save(sourceKey: String, item: VodInfo) = withContext(Dispatchers.IO) {
+        RoomDataManger.insertVodRecord(sourceKey, item)
+    }
 }

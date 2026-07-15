@@ -3,6 +3,7 @@ package com.hotplato.tvbox.crawler.opt
 import com.github.catvod.crawler.SpiderNull
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.bean.SourceBean
+import com.hotplato.tvbox.crawler.SpiderManager
 import com.hotplato.tvbox.util.LOG
 import com.hotplato.tvbox.util.DiagnosticLog
 import org.json.JSONObject
@@ -88,7 +89,10 @@ object SpiderGateway {
         val startedAt = System.currentTimeMillis()
         DiagnosticLog.info("SpiderCall", "开始 key=${sourceBean.key} $operation")
         return try {
-            SpiderDispatcher.withSource(sourceBean.key) {
+            SpiderDispatcher.withSource(
+                sourceKey = sourceBean.key,
+                serializePerSource = !SpiderManager.isJsSpiderApi(sourceBean.api),
+            ) {
                 SpiderInstancePool.withSpider(sourceBean) { sp ->
                     if (sp is SpiderNull) {
                         LOG.i(
@@ -120,7 +124,10 @@ object SpiderGateway {
         val startedAt = System.currentTimeMillis()
         DiagnosticLog.info("SpiderCall", "开始 key=${sourceBean.key} $operation")
         return try {
-            SpiderDispatcher.withSource(sourceBean.key) {
+            SpiderDispatcher.withSource(
+                sourceKey = sourceBean.key,
+                serializePerSource = !SpiderManager.isJsSpiderApi(sourceBean.api),
+            ) {
                 SpiderInstancePool.withSpider(sourceBean) { sp ->
                     if (sp is SpiderNull) {
                         LOG.i(

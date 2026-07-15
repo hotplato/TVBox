@@ -169,6 +169,9 @@ public final class Media3Backend implements PlayerBackend {
         player.setPlaybackParameters(new PlaybackParameters(speed));
         player.prepare();
         player.setPlayWhenReady(true);
+        // Some broken streams never report a video size, so waiting until
+        // onVideoSizeChanged leaves the UI buffering forever.
+        scheduleFirstFrameTimeout();
     }
 
     @Override

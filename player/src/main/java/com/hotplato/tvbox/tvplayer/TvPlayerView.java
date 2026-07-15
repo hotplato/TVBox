@@ -54,6 +54,8 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
     @Nullable
     private String errorMessage;
     private boolean errorRetryable = true;
+    /** Monotonic generation used to ignore callbacks emitted by a released backend. */
+    private long playbackSession;
     private final List<OnStateChangeListener> stateListeners = new ArrayList<>();
 
     public interface OnStateChangeListener {
@@ -131,6 +133,7 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
     }
 
     private void rebuildBackend() {
+        final long session = ++playbackSession;
         if (backend != null) {
             backend.release();
             backend = null;
@@ -144,7 +147,7 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
         } else {
             backend = new Media3Backend(getContext(), playerContainer, renderType);
         }
-        backend.setListener(this);
+        backend.setListener(listenerFor(session));
         backend.setScreenScaleType(screenScaleType);
         if (videoController != null) {
             playerContainer.addView(videoController, new LayoutParams(
@@ -184,6 +187,7 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
     }
 
     public void release() {
+        playbackSession++;
         saveProgress();
         if (backend != null) {
             backend.release();
@@ -191,6 +195,27 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
         }
         // Keep last url/headers so callers can release+start after setUrl; empty-url races go to ERROR.
         setPlayState(TvPlayer.STATE_IDLE);
+    }
+
+    private PlayerBackend.Listener listenerFor(final long session) {
+        return new PlayerBackend.Listener() {
+            private boolean active() {
+                return session == playbackSession;
+            }
+
+            @Override public void onPrepared() { if (active()) TvPlayerView.this.onPrepared(); }
+            @Override public void onCompletion() { if (active()) TvPlayerView.this.onCompletion(); }
+            @Override public void onError() { if (active()) TvPlayerView.this.onError(); }
+            @Override public void onError(@Nullable String message, boolean retryable) {
+                if (active()) TvPlayerView.this.onError(message, retryable);
+            }
+            @Override public void onInfoPlaying() { if (active()) TvPlayerView.this.onInfoPlaying(); }
+            @Override public void onPaused() { if (active()) TvPlayerView.this.onPaused(); }
+            @Override public void onBuffering(boolean buffering) { if (active()) TvPlayerView.this.onBuffering(buffering); }
+            @Override public void onVideoSizeChanged(int width, int height) {
+                if (active()) TvPlayerView.this.onVideoSizeChanged(width, height);
+            }
+        };
     }
 
     private void saveProgress() {

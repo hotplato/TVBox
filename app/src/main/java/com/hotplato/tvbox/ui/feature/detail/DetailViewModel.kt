@@ -6,7 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.bean.AbsXml
 import com.hotplato.tvbox.bean.VodInfo
-import com.hotplato.tvbox.cache.RoomDataManger
+import com.hotplato.tvbox.data.CollectRepository
+import com.hotplato.tvbox.data.HistoryRepository
 import com.hotplato.tvbox.viewmodel.SourceViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,10 +49,8 @@ class DetailViewModel : ViewModel() {
         info.sourceKey = requestedSourceKey
         viewModelScope.launch {
             val (record, collected) = withContext(Dispatchers.IO) {
-                RoomDataManger.getVodInfo(requestedSourceKey, requestedVodId) to
-                    RoomDataManger.getAllVodCollect().any {
-                        it.sourceKey == requestedSourceKey && it.vodId == requestedVodId
-                    }
+                HistoryRepository.find(requestedSourceKey, requestedVodId) to
+                    CollectRepository.contains(requestedSourceKey, requestedVodId)
             }
             // The detail response may arrive after navigation has moved to another item.
             if (this@DetailViewModel.sourceKey != requestedSourceKey ||
@@ -113,13 +112,8 @@ class DetailViewModel : ViewModel() {
         val info = _uiState.value.vodInfo ?: return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                if (_uiState.value.collected) {
-                    RoomDataManger.getAllVodCollect()
-                        .firstOrNull { it.sourceKey == sourceKey && it.vodId == vodId }
-                        ?.let { RoomDataManger.deleteVodCollect(it.id) }
-                } else {
-                    RoomDataManger.insertVodCollect(sourceKey, info)
-                }
+                if (_uiState.value.collected) CollectRepository.remove(sourceKey, vodId)
+                else CollectRepository.save(sourceKey, info)
             }
             _uiState.update { it.copy(collected = !it.collected) }
         }
@@ -132,7 +126,7 @@ class DetailViewModel : ViewModel() {
         info.playIndex = index
         _uiState.update { it.copy(selectedEpisodeIndex = index, vodInfo = info) }
         viewModelScope.launch(Dispatchers.IO) {
-            RoomDataManger.insertVodRecord(sourceKey, info)
+            HistoryRepository.save(sourceKey, info)
         }
         return info
     }

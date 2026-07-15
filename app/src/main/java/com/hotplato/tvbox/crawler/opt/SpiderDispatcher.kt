@@ -29,10 +29,15 @@ object SpiderDispatcher {
     suspend fun <T> withSource(
         sourceKey: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+        serializePerSource: Boolean = true,
         block: suspend () -> T,
     ): T = withContext(Dispatchers.IO) {
         global.withPermit {
-            mutexFor(sourceKey).withLock {
+            if (serializePerSource) {
+                mutexFor(sourceKey).withLock {
+                    withTimeout(timeoutMs) { block() }
+                }
+            } else {
                 withTimeout(timeoutMs) {
                     block()
                 }

@@ -1,14 +1,12 @@
 package com.hotplato.tvbox.util;
 
 import com.hotplato.tvbox.base.App;
-import com.hotplato.tvbox.picasso.MyOkhttpDownLoader;
 import com.hotplato.tvbox.util.SSL.SSLSocketFactoryCompat;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.https.HttpsUtils;
 import com.lzy.okgo.interceptor.HttpLoggingInterceptor;
 import com.lzy.okgo.model.HttpHeaders;
 import com.orhanobut.hawk.Hawk;
-import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.security.cert.CertificateException;
@@ -118,15 +116,8 @@ public class OkGoHelper {
         OkHttpClient okHttpClient = builder.build();
         OkGo.getInstance().setOkHttpClient(okHttpClient);
 
-        initPicasso(okHttpClient);
         initCoil(okHttpClient);
         ImageHostRewrite.prefetch();
-    }
-
-    static void initPicasso(OkHttpClient client) {
-        MyOkhttpDownLoader downloader = new MyOkhttpDownLoader(client);
-        Picasso picasso = new Picasso.Builder(App.getInstance()).downloader(downloader).build();
-        Picasso.setSingletonInstance(picasso);
     }
 
     static void initCoil(OkHttpClient client) {

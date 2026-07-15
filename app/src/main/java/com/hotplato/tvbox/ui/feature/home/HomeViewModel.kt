@@ -15,7 +15,8 @@ import com.hotplato.tvbox.bean.MovieSort
 import com.hotplato.tvbox.bean.SourceBean
 import com.hotplato.tvbox.bean.StoreBean
 import com.hotplato.tvbox.bean.VodInfo
-import com.hotplato.tvbox.cache.RoomDataManger
+import com.hotplato.tvbox.data.HistoryRepository
+import com.hotplato.tvbox.data.SettingsRepository
 import com.hotplato.tvbox.server.ControlManager
 import com.hotplato.tvbox.util.DefaultConfig
 import com.hotplato.tvbox.util.DiagnosticLog
@@ -173,8 +174,7 @@ class HomeViewModel : ViewModel() {
 
     fun selectStore(store: StoreBean) {
         viewModelScope.launch {
-            Hawk.put(HawkConfig.STORE_API, store.url)
-            Hawk.put(HawkConfig.STORE_NAME, store.name ?: "")
+            SettingsRepository.setStore(store.url ?: "", store.name ?: "")
             bootstrap(false)
         }
     }
@@ -214,7 +214,7 @@ class HomeViewModel : ViewModel() {
 
     /** 对齐遗留 UserFragment：0 豆瓣热播 / 1 数据源推荐 / 2 历史记录 */
     private fun loadHomeRec() {
-        when (Hawk.get(HawkConfig.HOME_REC, 0)) {
+        when (SettingsRepository.settings.value.homeRec) {
             1 -> {
                 _uiState.update {
                     it.copy(loading = false, videos = homeSourceRec, error = null)
@@ -222,7 +222,7 @@ class HomeViewModel : ViewModel() {
             }
             2 -> {
                 viewModelScope.launch(Dispatchers.IO) {
-                    val vodList = RoomDataManger.getAllVodRecord(10).map { toVideo(it) }
+                    val vodList = HistoryRepository.load(10).map { toVideo(it) }
                     _uiState.update {
                         it.copy(loading = false, videos = vodList, error = null)
                     }
