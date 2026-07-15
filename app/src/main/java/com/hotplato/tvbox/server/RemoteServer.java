@@ -12,7 +12,10 @@ import com.hotplato.tvbox.util.HawkConfig;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,12 +81,15 @@ public class RemoteServer extends NanoHTTPD {
         return json(Response.Status.OK, data);
     }
     private Response config(IHTTPSession session) throws Exception {
-        if (session.getMethod() == Method.GET) { JsonObject r = new JsonObject(); r.addProperty("url", Hawk.get(HawkConfig.API_URL, "")); return json(Response.Status.OK, r); }
+        if (session.getMethod() == Method.GET) { JsonObject r = new JsonObject(); r.addProperty("url", Hawk.get(HawkConfig.API_URL, "")); r.add("settings", settingsJson()); return json(Response.Status.OK, r); }
         if (session.getMethod() != Method.PUT && session.getMethod() != Method.POST) return error(Response.Status.METHOD_NOT_ALLOWED, "method_not_allowed", "仅支持读取或更新");
-        String url = body(session).optString("url", "").trim();
+        JSONObject input = body(session);
+        String url = input.optString("url", Hawk.get(HawkConfig.API_URL, "")).trim();
         if (!(url.startsWith("http://") || url.startsWith("https://"))) return error(Response.Status.BAD_REQUEST, "invalid_url", "配置地址必须是 HTTP(S) URL");
-        if (receiver != null) receiver.onApiReceived(url);
-        JsonObject r = new JsonObject(); r.addProperty("accepted", true); r.addProperty("message", "已保存，电视正在重新加载"); return json(Response.Status.ACCEPTED, r);
+        applySettings(input.optJSONObject("settings"));
+        boolean reload = !url.equals(Hawk.get(HawkConfig.API_URL, ""));
+        if (reload && receiver != null) receiver.onApiReceived(url);
+        JsonObject r = new JsonObject(); r.addProperty("accepted", reload); r.addProperty("message", reload ? "已保存，电视正在重新加载" : "设置已保存"); return json(reload ? Response.Status.ACCEPTED : Response.Status.OK, r);
     }
     private Response search(JSONObject input) {
         String word = input.optString("word", "").trim(); if (word.isEmpty()) return error(Response.Status.BAD_REQUEST, "invalid_word", "请输入搜索内容");
@@ -107,7 +113,19 @@ public class RemoteServer extends NanoHTTPD {
         String key = header.substring(7); Long expiry = sessions.get(key);
         if (expiry == null || expiry < System.currentTimeMillis()) { sessions.remove(key); return false; } return true;
     }
-    private JSONObject body(IHTTPSession session) throws Exception { Map<String, String> files = new HashMap<>(); session.parseBody(files); String raw = files.get("postData"); return raw == null || raw.trim().isEmpty() ? new JSONObject() : new JSONObject(raw); }
+    private JSONObject body(IHTTPSession session) throws Exception {
+        Map<String, String> files = new HashMap<>(); session.parseBody(files);
+        String raw = files.get("postData");
+        // NanoHTTPD stores PUT bodies in a temporary file while POST bodies are in postData.
+        if (raw == null && files.get("content") != null) {
+            try (InputStream input = new FileInputStream(files.get("content")); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[1024]; int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                raw = new String(output.toByteArray(), StandardCharsets.UTF_8);
+            }
+        }
+        return raw == null || raw.trim().isEmpty() ? new JSONObject() : new JSONObject(raw);
+    }
     private Response raw(int id, String mime) { InputStream in = context.getResources().openRawResource(id); try { return newFixedLengthResponse(Response.Status.OK, mime + "; charset=utf-8", in, in.available()); } catch (IOException e) { return error(Response.Status.INTERNAL_ERROR, "asset_error", "页面加载失败"); } }
     private Response ok() { JsonObject r = new JsonObject(); r.addProperty("ok", true); return json(Response.Status.OK, r); }
     private Response accepted() { JsonObject r = new JsonObject(); r.addProperty("accepted", true); return json(Response.Status.ACCEPTED, r); }
@@ -116,6 +134,29 @@ public class RemoteServer extends NanoHTTPD {
     private String nextCode() { return String.format(java.util.Locale.US, "%06d", random.nextInt(1_000_000)); }
     private String token() { byte[] b = new byte[24]; random.nextBytes(b); StringBuilder out = new StringBuilder(); for (byte x : b) out.append(String.format(java.util.Locale.US, "%02x", x)); return out.toString(); }
     private static String safe(String s) { return s == null || s.isEmpty() ? "请求无效" : s; }
+    private JsonObject settingsJson() {
+        JsonObject value = new JsonObject();
+        value.addProperty("debugOpen", Hawk.get(HawkConfig.DEBUG_OPEN, false));
+        value.addProperty("parseWebView", Hawk.get(HawkConfig.PARSE_WEBVIEW, true));
+        value.addProperty("playType", Hawk.get(HawkConfig.PLAY_TYPE, 2));
+        value.addProperty("playRender", Hawk.get(HawkConfig.PLAY_RENDER, 0));
+        value.addProperty("playScale", Hawk.get(HawkConfig.PLAY_SCALE, 0));
+        value.addProperty("dohUrl", Hawk.get(HawkConfig.DOH_URL, 0));
+        value.addProperty("homeRec", Hawk.get(HawkConfig.HOME_REC, 0));
+        value.addProperty("searchView", Hawk.get(HawkConfig.SEARCH_VIEW, 0));
+        return value;
+    }
+    private void applySettings(JSONObject value) {
+        if (value == null) return;
+        if (value.has("debugOpen")) Hawk.put(HawkConfig.DEBUG_OPEN, value.optBoolean("debugOpen"));
+        if (value.has("parseWebView")) Hawk.put(HawkConfig.PARSE_WEBVIEW, value.optBoolean("parseWebView"));
+        if (value.has("playType")) Hawk.put(HawkConfig.PLAY_TYPE, value.optInt("playType") == 0 ? 0 : 2);
+        if (value.has("playRender")) Hawk.put(HawkConfig.PLAY_RENDER, value.optInt("playRender") == 1 ? 1 : 0);
+        if (value.has("playScale")) { int scale = value.optInt("playScale"); if (scale >= 0 && scale <= 5) Hawk.put(HawkConfig.PLAY_SCALE, scale); }
+        if (value.has("dohUrl")) { int doh = value.optInt("dohUrl"); if (doh >= 0 && doh <= 100) Hawk.put(HawkConfig.DOH_URL, doh); }
+        if (value.has("homeRec")) { int home = value.optInt("homeRec"); if (home >= 0 && home <= 2) Hawk.put(HawkConfig.HOME_REC, home); }
+        if (value.has("searchView")) Hawk.put(HawkConfig.SEARCH_VIEW, value.optInt("searchView") == 1 ? 1 : 0);
+    }
     public String getServerAddress() { return "http://" + getLocalIPAddress(context) + ":" + serverPort + "/"; }
     public String getLoadAddress() { return "http://127.0.0.1:" + serverPort + "/"; }
     @SuppressLint("DefaultLocale") public static String getLocalIPAddress(Context context) { WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE); int ip = wifi == null ? 0 : wifi.getConnectionInfo().getIpAddress(); return ip == 0 ? "0.0.0.0" : String.format("%d.%d.%d.%d", ip & 255, ip >> 8 & 255, ip >> 16 & 255, ip >> 24 & 255); }
