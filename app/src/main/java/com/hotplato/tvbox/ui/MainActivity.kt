@@ -2,6 +2,7 @@ package com.hotplato.tvbox.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -20,6 +21,8 @@ import com.hotplato.tvbox.ui.navigation.TvBoxNavGraph
 import com.hotplato.tvbox.ui.navigation.TvBoxRoutes
 import com.hotplato.tvbox.ui.theme.TvTheme
 import com.hotplato.tvbox.ui.util.hideSystemBars
+import com.hotplato.tvbox.server.RemotePlaybackBridge
+import com.google.gson.JsonObject
 
 class MainActivity : ComponentActivity() {
     private val homeViewModel: HomeViewModel by viewModels()
@@ -69,6 +72,33 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemBars()
+        RemotePlaybackBridge.register(remoteKeyTarget)
+    }
+
+    override fun onPause() {
+        RemotePlaybackBridge.unregister(remoteKeyTarget)
+        super.onPause()
+    }
+
+    private val remoteKeyTarget = object : RemotePlaybackBridge.Target {
+        override fun command(action: String, value: Double): String? {
+            val keyCode = when (action) {
+                "key_up" -> KeyEvent.KEYCODE_DPAD_UP
+                "key_down" -> KeyEvent.KEYCODE_DPAD_DOWN
+                "key_left" -> KeyEvent.KEYCODE_DPAD_LEFT
+                "key_right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+                "key_enter" -> KeyEvent.KEYCODE_DPAD_CENTER
+                "key_back" -> KeyEvent.KEYCODE_BACK
+                else -> return "不支持的遥控按键"
+            }
+            runOnUiThread {
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+            }
+            return null
+        }
+
+        override fun state(): JsonObject = JsonObject().apply { addProperty("available", false) }
     }
 
     private fun intentToRoute(intent: Intent?): String? {

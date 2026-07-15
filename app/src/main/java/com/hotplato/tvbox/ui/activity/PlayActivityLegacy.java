@@ -446,6 +446,11 @@ public class PlayActivityLegacy extends BaseActivity {
             runOnUiThread(() -> {
                 long pos = mVideoView.getCurrentPosition();
                 switch (action) {
+                    case "key_up": case "key_down": case "key_left": case "key_right": case "key_enter": case "key_back":
+                        int keyCode = "key_up".equals(action) ? KeyEvent.KEYCODE_DPAD_UP : "key_down".equals(action) ? KeyEvent.KEYCODE_DPAD_DOWN : "key_left".equals(action) ? KeyEvent.KEYCODE_DPAD_LEFT : "key_right".equals(action) ? KeyEvent.KEYCODE_DPAD_RIGHT : "key_enter".equals(action) ? KeyEvent.KEYCODE_DPAD_CENTER : KeyEvent.KEYCODE_BACK;
+                        dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
+                        dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
+                        break;
                     case "play": mVideoView.start(); break;
                     case "pause": mVideoView.pause(); break;
                     case "stop": mVideoView.release(); break;
@@ -460,7 +465,7 @@ public class PlayActivityLegacy extends BaseActivity {
                 }
             });
             switch (action) {
-                case "play": case "pause": case "stop": case "seek_relative": case "seek": case "speed": case "volume": return null;
+                case "key_up": case "key_down": case "key_left": case "key_right": case "key_enter": case "key_back": case "play": case "pause": case "stop": case "seek_relative": case "seek": case "speed": case "volume": return null;
                 default: return "不支持的播放控制";
             }
         }

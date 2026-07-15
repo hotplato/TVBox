@@ -55,6 +55,8 @@ import java.util.Locale;
 
 import com.hotplato.tvbox.tvplayer.TvPlayer;
 import com.hotplato.tvbox.tvplayer.TvPlayerView;
+import com.hotplato.tvbox.server.RemotePlaybackBridge;
+import com.google.gson.JsonObject;
 
 /**
  * @author pj567
@@ -88,6 +90,23 @@ public class LivePlayActivityLegacy extends BaseActivity {
     private LiveChannelItem currentLiveChannelItem = null;
     private LivePlayerManager livePlayerManager = new LivePlayerManager();
     private ArrayList<Integer> channelGroupPasswordConfirmed = new ArrayList<>();
+    private final RemotePlaybackBridge.Target remoteKeyTarget = new RemotePlaybackBridge.Target() {
+        @Override public String command(String action, double value) {
+            final int keyCode;
+            switch (action) {
+                case "key_up": keyCode = KeyEvent.KEYCODE_DPAD_UP; break;
+                case "key_down": keyCode = KeyEvent.KEYCODE_DPAD_DOWN; break;
+                case "key_left": keyCode = KeyEvent.KEYCODE_DPAD_LEFT; break;
+                case "key_right": keyCode = KeyEvent.KEYCODE_DPAD_RIGHT; break;
+                case "key_enter": keyCode = KeyEvent.KEYCODE_DPAD_CENTER; break;
+                case "key_back": keyCode = KeyEvent.KEYCODE_BACK; break;
+                default: return "直播仅支持方向、确认和返回按键";
+            }
+            runOnUiThread(() -> { dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode)); dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode)); });
+            return null;
+        }
+        @Override public JsonObject state() { JsonObject state = new JsonObject(); state.addProperty("available", mVideoView != null); if (mVideoView != null) state.addProperty("playing", mVideoView.isPlaying()); return state; }
+    };
 
     @Override
     protected int getLayoutResID() {
@@ -176,6 +195,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        RemotePlaybackBridge.register(remoteKeyTarget);
         if (mVideoView != null) {
             mVideoView.resume();
         }
@@ -184,6 +204,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
 
     @Override
     protected void onPause() {
+        RemotePlaybackBridge.unregister(remoteKeyTarget);
         super.onPause();
         if (mVideoView != null) {
             mVideoView.pause();
@@ -192,6 +213,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        RemotePlaybackBridge.unregister(remoteKeyTarget);
         super.onDestroy();
         if (mVideoView != null) {
             mVideoView.release();
