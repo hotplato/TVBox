@@ -1,5 +1,6 @@
 package com.hotplato.tvbox.ui.feature.history
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -34,6 +35,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BackHandler(onBack = onBack)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -43,7 +45,6 @@ fun HistoryScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(bottom = 16.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text(
                 text = "观看历史",
                 style = MaterialTheme.typography.headlineMedium,

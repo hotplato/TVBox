@@ -65,6 +65,7 @@ import com.hotplato.tvbox.ui.theme.TvBackground
 import com.hotplato.tvbox.ui.theme.TvFocusBorder
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.theme.TvOnBackground
+import com.hotplato.tvbox.ui.theme.TvPrimary
 import com.hotplato.tvbox.ui.theme.TvSurface
 
 @Composable
@@ -177,20 +178,24 @@ fun HomeScreen(
                 }
                 val rowHeight = (maxHeight - heroHeight - headerHeight)
                     .coerceIn(minRowHeight, maxRowHeight)
-                val cardWidth = ((rowHeight - 8.dp) * 0.70f).coerceIn(125.dp, 152.dp)
+                val cardWidth = ((rowHeight - 8.dp) * 0.70f).coerceIn(128.dp, 156.dp)
 
                 Column(modifier = Modifier.fillMaxSize()) {
-                    if (featured != null) {
-                        HomeFeaturedSection(
-                            video = featured,
-                            compact = heroHeight < 200.dp,
-                            onOpen = {
-                                openVideo(featured, onOpenDetail, onOpenSearch)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(heroHeight),
-                        )
+                    Crossfade(
+                        targetState = featured,
+                        label = "home-featured",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(heroHeight),
+                    ) { video ->
+                        if (video != null) {
+                            HomeFeaturedSection(
+                                video = video,
+                                compact = heroHeight < 200.dp,
+                                onOpen = { openVideo(video, onOpenDetail, onOpenSearch) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
 
                     val sectionTitle = state.sorts.getOrNull(state.selectedSortIndex)?.name
@@ -243,6 +248,7 @@ fun HomeScreen(
                                     imageUrl = item.pic,
                                     subtitle = item.note,
                                     cardWidth = cardWidth,
+                                    active = index == focusedIndex,
                                     onFocused = { focusedIndex = index },
                                     onClick = {
                                         openVideo(item, onOpenDetail, onOpenSearch)
@@ -391,6 +397,7 @@ private fun HomePosterCard(
     onFocused: () -> Unit,
     onClick: () -> Unit,
     cardWidth: Dp = 180.dp,
+    active: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
@@ -402,58 +409,71 @@ private fun HomePosterCard(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .then(if (focused) Modifier.border(2.dp, TvFocusBorder, shape) else Modifier)
+            .then(
+                when {
+                    focused -> Modifier.border(2.dp, TvFocusBorder, shape)
+                    active -> Modifier.border(1.5.dp, TvPrimary.copy(alpha = 0.88f), shape)
+                    else -> Modifier
+                },
+            )
             .focusable(),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = TvSurface.copy(alpha = 0.72f),
-            focusedContainerColor = TvSurface.copy(alpha = 0.92f),
+            containerColor = TvSurface.copy(alpha = 0.76f),
+            focusedContainerColor = TvSurface.copy(alpha = 0.96f),
             pressedContainerColor = TvSurface,
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.045f),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
     ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.78f)
-                    .background(TvSurface.copy(alpha = 0.86f))
-                    .clip(shape),
-            ) {
-                VodCoverImage(
-                    pic = imageUrl,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.78f)
+                .background(TvSurface.copy(alpha = 0.86f))
+                .clip(shape),
+        ) {
+            VodCoverImage(
+                pic = imageUrl,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .height(74.dp)
+                    .height(72.dp)
                     .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, TvSurface.copy(alpha = 0.96f))),
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                TvBackground.copy(alpha = 0.64f),
+                                TvBackground.copy(alpha = 0.97f),
+                            ),
+                        ),
                     ),
             )
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                    .padding(start = 9.dp, end = 9.dp, bottom = 14.dp),
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = title.ifBlank { "未命名影片" },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = TvMuted,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = if (focused) 0.84f else 0.68f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = 1.dp),
                     )
                 }
             }

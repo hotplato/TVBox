@@ -3,6 +3,7 @@ package com.hotplato.tvbox.ui.feature.diagnostics
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import com.hotplato.tvbox.util.DiagnosticLog
 fun DiagnosticsLogScreen(onBack: () -> Unit) {
     val entries by DiagnosticLog.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    BackHandler(onBack = onBack)
     Column(
         Modifier
             .fillMaxSize()
@@ -38,7 +40,6 @@ fun DiagnosticsLogScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 20.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text(text = "运行日志", style = MaterialTheme.typography.headlineMedium)
             TvFocusButton(text = "复制全部", onClick = { copyLogs(context) })
             TvFocusButton(text = "清空", onClick = DiagnosticLog::clear)

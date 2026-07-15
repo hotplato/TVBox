@@ -1,5 +1,6 @@
 package com.hotplato.tvbox.ui.feature.collect
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -38,6 +39,8 @@ fun CollectScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val effect by viewModel.effects.collectAsStateWithLifecycle()
 
+    BackHandler(onBack = onBack)
+
     LaunchedEffect(effect) {
         when (val e = effect) {
             is CollectEffect.OpenDetail -> {
@@ -61,7 +64,6 @@ fun CollectScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(bottom = 16.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text(
                 text = "我的收藏",
                 style = MaterialTheme.typography.headlineMedium,

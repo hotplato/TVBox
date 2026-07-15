@@ -1,6 +1,7 @@
 package com.hotplato.tvbox.ui.feature.push
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,10 +33,10 @@ fun PushScreen(onOpenDetail: (sourceKey: String, vodId: String) -> Unit, onBack:
     val address = remember { manager.getAddress(false) }
     val qrBitmap: Bitmap? = remember(address) { address.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }?.let { QRCodeGen.generateBitmap(it, 320, 320, 4) } }
     var remaining by remember { mutableLongStateOf(manager.pairingRemainingSeconds) }
+    BackHandler(onBack = onBack)
     LaunchedEffect(Unit) { while (true) { remaining = manager.pairingRemainingSeconds; delay(1000) } }
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text("远程控制", style = MaterialTheme.typography.headlineMedium)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(44.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -1,5 +1,6 @@
 package com.hotplato.tvbox.ui.feature.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +43,8 @@ fun SettingsScreen(
     var showApiEditor by remember { mutableStateOf(false) }
     var apiDraft by remember(state.apiUrl) { mutableStateOf(state.apiUrl) }
 
+    BackHandler(onBack = onBack)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +55,6 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 20.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text(text = "设置", style = MaterialTheme.typography.headlineMedium)
         }
 

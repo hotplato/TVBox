@@ -1,13 +1,18 @@
 package com.hotplato.tvbox.ui.feature.search
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,18 +23,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.hotplato.tvbox.ui.component.EmptyState
 import com.hotplato.tvbox.ui.component.ErrorState
 import com.hotplato.tvbox.ui.component.TvFocusButton
-import com.hotplato.tvbox.ui.component.TvPosterCard
+import com.hotplato.tvbox.ui.component.VodCoverImage
+import com.hotplato.tvbox.ui.theme.TvFocusBorder
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.theme.TvOnBackground
 import com.hotplato.tvbox.ui.theme.TvSurface
@@ -42,6 +57,8 @@ fun SearchScreen(
     viewModel: SearchViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    BackHandler(onBack = onBack)
 
     LaunchedEffect(initialQuery) {
         if (!initialQuery.isNullOrBlank()) {
@@ -61,7 +78,6 @@ fun SearchScreen(
                 .fillMaxWidth()
                 .padding(bottom = 18.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             BasicTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
@@ -187,24 +203,97 @@ private fun SourceResultGroup(
             style = MaterialTheme.typography.titleMedium,
         )
         when {
-            group.items.isNotEmpty() -> LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            group.items.isNotEmpty() -> LazyRow(
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 items(group.items, key = { "${it.sourceKey}_${it.id}" }) { item ->
-                    val sourceLabel = group.sourceName
-                    val subtitle = listOfNotNull(sourceLabel, item.note?.takeIf { it.isNotBlank() }).joinToString(" · ")
-                    TvPosterCard(
+                    SearchPosterCard(
                         title = item.name ?: "",
                         imageUrl = item.pic,
-                        subtitle = subtitle,
-                        cardWidth = 168.dp,
+                        source = group.sourceName,
+                        status = item.note,
                         onClick = {
                             val key = item.sourceKey ?: group.sourceKey
-                            val id = item.id ?: return@TvPosterCard
+                            val id = item.id ?: return@SearchPosterCard
                             onOpenDetail(key, id)
                         },
                     )
                 }
             }
             else -> Text(groupStatusDetail(group), color = TvMuted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun SearchPosterCard(
+    title: String,
+    imageUrl: String?,
+    source: String,
+    status: String?,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    val secondary = listOfNotNull(
+        source.takeIf { it.isNotBlank() },
+        status?.takeIf { it.isNotBlank() },
+    ).joinToString(" · ")
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .width(158.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .then(if (focused) Modifier.border(2.dp, TvFocusBorder, shape) else Modifier),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = TvSurface.copy(alpha = 0.94f),
+            focusedContainerColor = TvSurface,
+            pressedContainerColor = TvSurface,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.045f),
+        shape = ClickableSurfaceDefaults.shape(shape = shape),
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.72f)
+                    .background(TvSurface),
+            ) {
+                VodCoverImage(
+                    pic = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = title.ifBlank { "未命名影片" },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TvOnBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (secondary.isNotBlank()) {
+                    Text(
+                        text = secondary,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (focused) Color.White.copy(alpha = 0.82f) else TvMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
         }
     }
 }

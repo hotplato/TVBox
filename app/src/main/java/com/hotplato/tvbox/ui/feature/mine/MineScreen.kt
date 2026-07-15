@@ -1,5 +1,6 @@
 package com.hotplato.tvbox.ui.feature.mine
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ fun MineScreen(
     onOpenPush: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -33,7 +35,6 @@ fun MineScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 12.dp),
         ) {
-            TvFocusButton(text = "返回", onClick = onBack)
             Text(text = "我的", style = MaterialTheme.typography.headlineMedium)
         }
         TvFocusButton(text = "历史记录", onClick = onOpenHistory, modifier = Modifier.fillMaxWidth())

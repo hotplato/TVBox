@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,36 +17,13 @@ import com.hotplato.tvbox.ui.theme.TvMuted
 @Composable
 fun LoadingState(
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
 ) {
-    if (onBack == null) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "加载中…",
-                style = MaterialTheme.typography.titleLarge,
-                color = TvMuted,
-            )
-        }
-    } else {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 24.dp),
-        ) {
-            TvFocusButton(text = "返回", onClick = onBack)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "加载中…",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TvMuted,
-                )
-            }
-        }
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = "加载中…",
+            style = MaterialTheme.typography.titleLarge,
+            color = TvMuted,
+        )
     }
 }
 
@@ -69,7 +45,6 @@ fun EmptyState(
 fun ErrorState(
     message: String,
     onRetry: (() -> Unit)? = null,
-    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -88,9 +63,6 @@ fun ErrorState(
             modifier = Modifier.padding(top = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (onBack != null) {
-                TvFocusButton(text = "返回", onClick = onBack)
-            }
             if (onRetry != null) {
                 TvFocusButton(text = "重试", onClick = onRetry)
             }

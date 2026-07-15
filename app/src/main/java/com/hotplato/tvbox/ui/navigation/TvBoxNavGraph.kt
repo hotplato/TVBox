@@ -1,6 +1,5 @@
 package com.hotplato.tvbox.ui.navigation
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +56,6 @@ fun TvBoxNavGraph(
                 restoreMineFocus = true
                 navController.popBackStack()
             }
-            BackHandler(onBack = leaveMine)
             MineScreen(
                 onBack = leaveMine,
                 onOpenHistory = { navController.navigate(TvBoxRoutes.HISTORY) },
