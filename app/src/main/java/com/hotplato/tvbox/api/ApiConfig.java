@@ -2,6 +2,8 @@ package com.hotplato.tvbox.api;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Base64;
 
@@ -20,6 +22,7 @@ import com.hotplato.tvbox.util.DefaultConfig;
 import com.hotplato.tvbox.util.GsonHolder;
 import com.hotplato.tvbox.util.HawkConfig;
 import com.hotplato.tvbox.util.MD5;
+import com.hotplato.tvbox.util.DiagnosticLog;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -40,6 +43,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author pj567
@@ -62,6 +67,8 @@ public class ApiConfig {
 
     private final SpiderManager spiderManager = new SpiderManager();
     private List<StoreBean> storeBeanList = new ArrayList<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService configExecutor = Executors.newSingleThreadExecutor(r -> new Thread(r, "config-io"));
 
     private ApiConfig() {
         sourceBeanList = new LinkedHashMap<>();
@@ -81,25 +88,32 @@ public class ApiConfig {
     }
 
     public void loadConfig(boolean useCache, LoadConfigCallback callback, Activity activity) {
+        LoadConfigCallback mainCallback = onMain(callback);
         String apiUrl = Hawk.get(HawkConfig.API_URL, "");
         if (apiUrl.isEmpty()) {
-            callback.error("-1");
+            mainCallback.error("-1");
             return;
         }
+        long startedAt = System.currentTimeMillis();
+        DiagnosticLog.info("Config", (useCache ? "开始加载缓存配置 " : "开始联网加载配置 ") + DiagnosticLog.redactUrl(apiUrl));
         fetchJson(apiUrl, useCache, new FetchCallback() {
             @Override
             public void onSuccess(String json) {
-                try {
-                    handleRootConfig(apiUrl, json, useCache, callback);
-                } catch (Throwable th) {
-                    th.printStackTrace();
-                    callback.error("解析配置失败");
-                }
+                configExecutor.execute(() -> {
+                    try {
+                        handleRootConfig(apiUrl, json, useCache, mainCallback);
+                        DiagnosticLog.info("Config", "配置解析完成", System.currentTimeMillis() - startedAt);
+                    } catch (Throwable th) {
+                        DiagnosticLog.error("Config", "配置解析失败: " + safeMessage(th), System.currentTimeMillis() - startedAt);
+                        mainCallback.error("解析配置失败");
+                    }
+                });
             }
 
             @Override
             public void onError(String msg) {
-                callback.error(msg);
+                DiagnosticLog.error("Config", "配置加载失败: " + msg, System.currentTimeMillis() - startedAt);
+                mainCallback.error(msg);
             }
         });
     }
@@ -108,13 +122,14 @@ public class ApiConfig {
      * 用户选中仓库后加载对应单仓配置。
      */
     public void loadSelectedStore(StoreBean store, boolean useCache, LoadConfigCallback callback) {
+        LoadConfigCallback mainCallback = onMain(callback);
         if (store == null || TextUtils.isEmpty(store.getUrl())) {
-            callback.error("多仓列表为空");
+            mainCallback.error("多仓列表为空");
             return;
         }
         Hawk.put(HawkConfig.STORE_API, store.getUrl());
         Hawk.put(HawkConfig.STORE_NAME, store.getName() != null ? store.getName() : "");
-        loadChildConfig(store.getUrl(), useCache, callback);
+        loadChildConfig(store.getUrl(), useCache, mainCallback);
     }
 
     public static void clearStoreSelection() {
@@ -192,13 +207,15 @@ public class ApiConfig {
         fetchJson(storeUrl, useCache, new FetchCallback() {
             @Override
             public void onSuccess(String json) {
-                try {
-                    parseJson(storeUrl, json);
-                    callback.success();
-                } catch (Throwable th) {
-                    th.printStackTrace();
-                    callback.error("解析配置失败");
-                }
+                configExecutor.execute(() -> {
+                    try {
+                        parseJson(storeUrl, json);
+                        callback.success();
+                    } catch (Throwable th) {
+                        DiagnosticLog.error("Config", "子仓解析失败: " + safeMessage(th));
+                        callback.error("解析配置失败");
+                    }
+                });
             }
 
             @Override
@@ -217,17 +234,28 @@ public class ApiConfig {
     private void fetchJson(String url, boolean useCache, FetchCallback callback) {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(url));
         if (useCache && cache.exists()) {
-            try {
-                callback.onSuccess(fixContentPath(url, readFile(cache)));
-                return;
-            } catch (Throwable th) {
-                th.printStackTrace();
-            }
+            configExecutor.execute(() -> {
+                long startedAt = System.currentTimeMillis();
+                try {
+                    callback.onSuccess(fixContentPath(url, readFile(cache)));
+                    DiagnosticLog.info("Config", "命中配置缓存 " + DiagnosticLog.redactUrl(url), System.currentTimeMillis() - startedAt);
+                } catch (Throwable th) {
+                    DiagnosticLog.warn("Config", "读取缓存失败，改为联网: " + safeMessage(th));
+                    fetchRemoteJson(url, cache, callback, true);
+                }
+            });
+            return;
         }
+        fetchRemoteJson(url, cache, callback, true);
+    }
+
+    private void fetchRemoteJson(String url, File cache, FetchCallback callback, boolean allowCacheFallback) {
         String apiFix = url;
         if (url.startsWith("clan://")) {
             apiFix = clanToAddress(url);
         }
+        long startedAt = System.currentTimeMillis();
+        DiagnosticLog.info("Config", "请求远程配置 " + DiagnosticLog.redactUrl(url));
         OkGo.<String>get(apiFix)
                 .tag(url)
                 .execute(new AbsCallback<String>() {
@@ -235,22 +263,18 @@ public class ApiConfig {
                     public void onSuccess(Response<String> response) {
                         try {
                             String json = response.body();
-                            try {
-                                File cacheDir = cache.getParentFile();
-                                if (cacheDir != null && !cacheDir.exists())
-                                    cacheDir.mkdirs();
-                                if (cache.exists())
-                                    cache.delete();
-                                FileOutputStream fos = new FileOutputStream(cache);
-                                fos.write(json.getBytes("UTF-8"));
-                                fos.flush();
-                                fos.close();
-                            } catch (Throwable th) {
-                                th.printStackTrace();
-                            }
-                            callback.onSuccess(fixContentPath(url, json));
+                            configExecutor.execute(() -> {
+                                try {
+                                    writeCacheAtomically(cache, json);
+                                    DiagnosticLog.info("Config", "远程配置已缓存 " + DiagnosticLog.redactUrl(url), System.currentTimeMillis() - startedAt);
+                                    callback.onSuccess(fixContentPath(url, json));
+                                } catch (Throwable th) {
+                                    DiagnosticLog.error("Config", "保存配置缓存失败: " + safeMessage(th));
+                                    callback.onError("解析配置失败");
+                                }
+                            });
                         } catch (Throwable th) {
-                            th.printStackTrace();
+                            DiagnosticLog.error("Config", "读取远程配置失败: " + safeMessage(th));
                             callback.onError("解析配置失败");
                         }
                     }
@@ -258,15 +282,18 @@ public class ApiConfig {
                     @Override
                     public void onError(Response<String> response) {
                         super.onError(response);
-                        if (cache.exists()) {
-                            try {
-                                callback.onSuccess(fixContentPath(url, readFile(cache)));
-                                return;
-                            } catch (Throwable th) {
-                                th.printStackTrace();
+                        configExecutor.execute(() -> {
+                            if (allowCacheFallback && cache.exists()) {
+                                try {
+                                    callback.onSuccess(fixContentPath(url, readFile(cache)));
+                                    DiagnosticLog.warn("Config", "网络失败，回退旧缓存 " + DiagnosticLog.redactUrl(url), System.currentTimeMillis() - startedAt);
+                                    return;
+                                } catch (Throwable th) {
+                                    DiagnosticLog.error("Config", "回退缓存失败: " + safeMessage(th));
+                                }
                             }
-                        }
-                        callback.onError("拉取配置失败\n" + (response.getException() != null ? response.getException().getMessage() : ""));
+                            callback.onError("拉取配置失败\n" + (response.getException() != null ? response.getException().getMessage() : ""));
+                        });
                     }
 
                     public String convertResponse(okhttp3.Response response) throws Throwable {
@@ -285,7 +312,6 @@ public class ApiConfig {
     }
 
     private String readFile(File f) throws Throwable {
-        System.out.println("从本地缓存加载" + f.getAbsolutePath());
         BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
         StringBuilder sb = new StringBuilder();
         String s;
@@ -294,6 +320,70 @@ public class ApiConfig {
         }
         bReader.close();
         return sb.toString();
+    }
+
+    private void writeCacheAtomically(File cache, String json) throws Throwable {
+        // A minimal JSON-object check prevents a transient HTML error page from replacing a known-good cache.
+        if (GsonHolder.gson.fromJson(json, JsonObject.class) == null)
+            throw new IllegalArgumentException("配置不是 JSON 对象");
+        File dir = cache.getParentFile();
+        if (dir != null && !dir.exists() && !dir.mkdirs())
+            throw new IllegalStateException("无法创建缓存目录");
+        File temp = new File(cache.getAbsolutePath() + ".tmp");
+        try (FileOutputStream fos = new FileOutputStream(temp)) {
+            fos.write(json.getBytes("UTF-8"));
+            fos.flush();
+        }
+        if (cache.exists() && !cache.delete())
+            throw new IllegalStateException("无法替换旧缓存");
+        if (!temp.renameTo(cache))
+            throw new IllegalStateException("无法完成缓存替换");
+    }
+
+    /** Refreshes raw config files only; active sources and spiders stay untouched until the next launch. */
+    public void refreshConfigCache() {
+        String apiUrl = Hawk.get(HawkConfig.API_URL, "");
+        if (TextUtils.isEmpty(apiUrl)) return;
+        File rootCache = new File(App.getInstance().getFilesDir(), MD5.encode(apiUrl));
+        DiagnosticLog.info("Config", "后台检查配置更新 " + DiagnosticLog.redactUrl(apiUrl));
+        fetchRemoteJson(apiUrl, rootCache, new FetchCallback() {
+            @Override
+            public void onSuccess(String rootJson) {
+                configExecutor.execute(() -> {
+                    try {
+                        JsonObject root = GsonHolder.gson.fromJson(rootJson, JsonObject.class);
+                        if (root != null && root.has("urls") && root.get("urls").isJsonArray()) {
+                            StoreBean selected = findRememberedStore(parseStoreList(root.getAsJsonArray("urls")));
+                            if (selected != null) {
+                                File childCache = new File(App.getInstance().getFilesDir(), MD5.encode(selected.getUrl()));
+                                fetchRemoteJson(selected.getUrl(), childCache, new FetchCallback() {
+                                    @Override public void onSuccess(String ignored) { DiagnosticLog.info("Config", "后台子仓更新完成"); }
+                                    @Override public void onError(String msg) { DiagnosticLog.warn("Config", "后台子仓更新失败: " + msg); }
+                                }, false);
+                            }
+                        }
+                        DiagnosticLog.info("Config", "后台配置更新完成，下次启动生效");
+                    } catch (Throwable th) {
+                        DiagnosticLog.warn("Config", "后台配置检查失败: " + safeMessage(th));
+                    }
+                });
+            }
+
+            @Override public void onError(String msg) { DiagnosticLog.warn("Config", "后台配置更新失败: " + msg); }
+        }, false);
+    }
+
+    private LoadConfigCallback onMain(LoadConfigCallback callback) {
+        return new LoadConfigCallback() {
+            @Override public void success() { mainHandler.post(callback::success); }
+            @Override public void retry() { mainHandler.post(callback::retry); }
+            @Override public void error(String msg) { mainHandler.post(() -> callback.error(msg)); }
+            @Override public void needSelect(List<StoreBean> stores) { mainHandler.post(() -> callback.needSelect(stores)); }
+        };
+    }
+
+    private static String safeMessage(Throwable th) {
+        return th == null || th.getMessage() == null ? th == null ? "未知错误" : th.getClass().getSimpleName() : th.getMessage();
     }
 
 

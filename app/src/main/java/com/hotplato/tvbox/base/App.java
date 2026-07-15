@@ -13,6 +13,7 @@ import com.hotplato.tvbox.crawler.RemoteToastFilter;
 import com.hotplato.tvbox.data.AppDataManager;
 import com.hotplato.tvbox.server.ControlManager;
 import com.hotplato.tvbox.util.HawkConfig;
+import com.hotplato.tvbox.util.DiagnosticLog;
 import com.hotplato.tvbox.util.OkGoHelper;
 import com.hotplato.tvbox.util.PlayerHelper;
 import com.kingja.loadsir.core.LoadSir;
@@ -35,6 +36,7 @@ public class App extends MultiDexApplication {
     @Override
     public void onCreate() {
         super.onCreate();
+        long startedAt = System.currentTimeMillis();
         instance = this;
         Init.set(this);
         ProcessExitGuard.install();
@@ -57,6 +59,7 @@ public class App extends MultiDexApplication {
                 .setSupportSubunits(Subunits.MM);
         PlayerHelper.init();
         ensureSpiderWorkDir();
+        DiagnosticLog.info("App", "应用初始化完成", System.currentTimeMillis() - startedAt);
     }
 
     @Override
@@ -83,7 +86,9 @@ public class App extends MultiDexApplication {
     private void initParams() {
         // Hawk
         Hawk.init(this).build();
-        Hawk.put(HawkConfig.DEBUG_OPEN, false);
+        if (!Hawk.contains(HawkConfig.DEBUG_OPEN)) {
+            Hawk.put(HawkConfig.DEBUG_OPEN, false);
+        }
         if (!Hawk.contains(HawkConfig.PLAY_TYPE)) {
             Hawk.put(HawkConfig.PLAY_TYPE, 2);
         }

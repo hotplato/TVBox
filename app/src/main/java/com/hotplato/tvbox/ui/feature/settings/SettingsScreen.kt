@@ -30,6 +30,7 @@ import com.hotplato.tvbox.util.PlayerHelper
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     onRequestHomeReload: () -> Unit,
     viewModel: SettingsViewModel = viewModel(),
 ) {
@@ -62,6 +63,7 @@ fun SettingsScreen(
                 apiDraft = state.apiUrl
             }
             SettingRow("调试", if (state.debugOpen) "已打开" else "已关闭", viewModel::toggleDebug)
+            SettingRow("运行日志", "查看本次启动的诊断信息", onOpenDiagnostics)
             SettingRow(
                 "解析 WebView",
                 if (state.parseWebView) "系统自带" else "XWalkView",

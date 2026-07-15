@@ -18,6 +18,7 @@ import com.hotplato.tvbox.bean.VodInfo
 import com.hotplato.tvbox.cache.RoomDataManger
 import com.hotplato.tvbox.server.ControlManager
 import com.hotplato.tvbox.util.DefaultConfig
+import com.hotplato.tvbox.util.DiagnosticLog
 import com.hotplato.tvbox.util.HawkConfig
 import com.hotplato.tvbox.viewmodel.SourceViewModel
 import com.lzy.okgo.OkGo
@@ -53,8 +54,13 @@ class HomeViewModel : ViewModel() {
     private val jarInitOk = AtomicBoolean(false)
     private var useCacheConfig = false
     private var homeSourceRec: List<Movie.Video> = emptyList()
+    private var bootstrapStartedAt = 0L
+    private var sortStartedAt = 0L
+    private var listStartedAt = 0L
+    private var refreshScheduled = false
 
     private val sortObserver = Observer<AbsSortXml?> { abs ->
+        DiagnosticLog.info("Home", if (abs == null) "首页分类加载失败" else "首页分类加载完成", elapsed(sortStartedAt))
         val homeKey = ApiConfig.get().homeSourceBean?.key ?: ""
         val sorts = DefaultConfig.adjustSort(
             homeKey,
@@ -82,6 +88,7 @@ class HomeViewModel : ViewModel() {
     }
 
     private val listObserver = Observer<AbsXml?> { abs ->
+        DiagnosticLog.info("Home", if (abs == null) "首页列表加载失败" else "首页列表加载完成", elapsed(listStartedAt))
         val videos = abs?.movie?.videoList ?: emptyList()
         _uiState.update {
             it.copy(loading = false, videos = videos, error = if (abs == null) "列表加载失败" else null)
@@ -92,11 +99,12 @@ class HomeViewModel : ViewModel() {
         ControlManager.get().startServer()
         sourceViewModel.sortResult.observeForever(sortObserver)
         sourceViewModel.listResult.observeForever(listObserver)
-        bootstrap()
+        bootstrap(useCache = true)
     }
 
     fun bootstrap(useCache: Boolean = false) {
         useCacheConfig = useCache
+        bootstrapStartedAt = System.currentTimeMillis()
         dataInitOk.set(false)
         jarInitOk.set(false)
         _uiState.update { it.copy(loading = true, error = null) }
@@ -106,6 +114,12 @@ class HomeViewModel : ViewModel() {
     private fun loadConfigPipeline() {
         if (dataInitOk.get() && jarInitOk.get()) {
             val key = ApiConfig.get().homeSourceBean?.key
+            DiagnosticLog.info("Home", "配置与爬虫已就绪，开始加载首页", elapsed(bootstrapStartedAt))
+            if (useCacheConfig && !refreshScheduled) {
+                refreshScheduled = true
+                ApiConfig.get().refreshConfigCache()
+            }
+            sortStartedAt = System.currentTimeMillis()
             sourceViewModel.getSort(key)
             return
         }
@@ -194,6 +208,7 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun loadList(sort: MovieSort.SortData, page: Int) {
+        listStartedAt = System.currentTimeMillis()
         sourceViewModel.getList(sort, page)
     }
 
@@ -299,4 +314,7 @@ class HomeViewModel : ViewModel() {
         sourceViewModel.listResult.removeObserver(listObserver)
         super.onCleared()
     }
+
+    private fun elapsed(startedAt: Long): Long? =
+        startedAt.takeIf { it > 0 }?.let { System.currentTimeMillis() - it }
 }

@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.hotplato.tvbox.ui.feature.collect.CollectScreen
 import com.hotplato.tvbox.ui.feature.detail.DetailScreen
+import com.hotplato.tvbox.ui.feature.diagnostics.DiagnosticsLogScreen
 import com.hotplato.tvbox.ui.feature.history.HistoryScreen
 import com.hotplato.tvbox.ui.feature.home.HomeScreen
 import com.hotplato.tvbox.ui.feature.home.HomeViewModel
@@ -96,11 +97,15 @@ fun TvBoxNavGraph(
         composable(TvBoxRoutes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onOpenDiagnostics = { navController.navigate(TvBoxRoutes.DIAGNOSTICS) },
                 onRequestHomeReload = {
                     homeViewModel.bootstrap(false)
                     navController.popBackStack(TvBoxRoutes.HOME, inclusive = false)
                 },
             )
+        }
+        composable(TvBoxRoutes.DIAGNOSTICS) {
+            DiagnosticsLogScreen(onBack = { navController.popBackStack() })
         }
         composable(TvBoxRoutes.HISTORY) {
             HistoryScreen(

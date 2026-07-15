@@ -5,6 +5,7 @@ object TvBoxRoutes {
     const val MINE = "mine"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
+    const val DIAGNOSTICS = "diagnostics"
     const val HISTORY = "history"
     const val COLLECT = "collect"
     const val PUSH = "push"

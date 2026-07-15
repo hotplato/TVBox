@@ -10,6 +10,7 @@ import com.hotplato.tvbox.bean.SourceBean;
 import com.hotplato.tvbox.crawler.opt.JarMd5Index;
 import com.hotplato.tvbox.crawler.opt.SpiderRuntime;
 import com.hotplato.tvbox.util.LOG;
+import com.hotplato.tvbox.util.DiagnosticLog;
 import com.hotplato.tvbox.util.MD5;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
@@ -91,6 +92,7 @@ public class SpiderManager {
     }
 
     public void loadJar(boolean useCache, String spider, JarLoadCallback callback) {
+        long startedAt = System.currentTimeMillis();
         String[] urls = spider.split(";md5;");
         String jarUrl = urls[0];
         String md5 = urls.length > 1 ? urls[1].trim() : "";
@@ -99,29 +101,32 @@ public class SpiderManager {
         if ((!md5.isEmpty() || useCache) && cache.exists()) {
             jarLoadExecutor.execute(() -> {
                 if (useCache) {
-                    loadJarAndPost(cache.getAbsolutePath(), callback);
+                    DiagnosticLog.info("Spider", "命中 JAR 缓存");
+                    loadJarAndPost(cache.getAbsolutePath(), callback, startedAt);
                     return;
                 }
                 if (JarMd5Index.matchesConfigured(cache, md5)) {
                     LOG.i("SpiderManager", "jar md5 sidecar hit, skip full-file scan");
-                    loadJarAndPost(cache.getAbsolutePath(), callback);
+                    DiagnosticLog.info("Spider", "JAR 校验缓存命中");
+                    loadJarAndPost(cache.getAbsolutePath(), callback, startedAt);
                     return;
                 }
                 if (MD5.getFileMd5(cache).equalsIgnoreCase(md5)) {
                     JarMd5Index.write(cache, md5);
-                    loadJarAndPost(cache.getAbsolutePath(), callback);
+                    loadJarAndPost(cache.getAbsolutePath(), callback, startedAt);
                 } else {
                     JarMd5Index.delete(cache);
-                    mainHandler.post(() -> downloadJar(jarUrl, cache, md5, callback));
+                    mainHandler.post(() -> downloadJar(jarUrl, cache, md5, callback, startedAt));
                 }
             });
             return;
         }
 
-        downloadJar(jarUrl, cache, md5, callback);
+        downloadJar(jarUrl, cache, md5, callback, startedAt);
     }
 
-    private void downloadJar(String jarUrl, File cache, String md5, JarLoadCallback callback) {
+    private void downloadJar(String jarUrl, File cache, String md5, JarLoadCallback callback, long startedAt) {
+        DiagnosticLog.info("Spider", "下载爬虫 JAR " + DiagnosticLog.redactUrl(jarUrl));
         OkGo.<File>get(jarUrl).execute(new AbsCallback<File>() {
 
             @Override
@@ -150,8 +155,9 @@ public class SpiderManager {
             @Override
             public void onSuccess(Response<File> response) {
                 if (response.body() != null && response.body().exists()) {
-                    loadJarOnBackground(response.body().getAbsolutePath(), callback);
+                    loadJarOnBackground(response.body().getAbsolutePath(), callback, startedAt);
                 } else {
+                    DiagnosticLog.error("Spider", "JAR 下载结果为空", System.currentTimeMillis() - startedAt);
                     callback.error("");
                 }
             }
@@ -159,19 +165,25 @@ public class SpiderManager {
             @Override
             public void onError(Response<File> response) {
                 super.onError(response);
+                DiagnosticLog.error("Spider", "JAR 下载失败", System.currentTimeMillis() - startedAt);
                 callback.error("");
             }
         });
     }
 
     /** DexClassLoader / Init 必须在后台；结果回调切回主线程。 */
-    private void loadJarOnBackground(String path, JarLoadCallback callback) {
-        jarLoadExecutor.execute(() -> loadJarAndPost(path, callback));
+    private void loadJarOnBackground(String path, JarLoadCallback callback, long startedAt) {
+        jarLoadExecutor.execute(() -> loadJarAndPost(path, callback, startedAt));
     }
 
-    private void loadJarAndPost(String path, JarLoadCallback callback) {
+    private void loadJarAndPost(String path, JarLoadCallback callback, long startedAt) {
         boolean ok = jarLoader.load(path);
         LOG.i("SpiderManager", "JarLoader.load thread=" + Thread.currentThread().getName() + " ok=" + ok);
+        if (ok) {
+            DiagnosticLog.info("Spider", "JAR 装载完成", System.currentTimeMillis() - startedAt);
+        } else {
+            DiagnosticLog.error("Spider", "JAR 装载失败", System.currentTimeMillis() - startedAt);
+        }
         mainHandler.post(() -> {
             if (ok) {
                 callback.success();
