@@ -1,6 +1,9 @@
 package com.hotplato.tvbox.util
 
 import android.util.Log
+import android.content.pm.ApplicationInfo
+import com.hotplato.tvbox.base.App
+import com.orhanobut.hawk.Hawk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +64,7 @@ object DiagnosticLog {
     }
 
     private fun append(level: String, module: String, message: String, durationMs: Long?) {
+        if (!isEnabled()) return
         val entry = DiagnosticLogEntry(System.currentTimeMillis(), level, module, message, durationMs)
         synchronized(lock) {
             if (entries.size == MAX_ENTRIES) entries.removeFirst()
@@ -73,6 +77,14 @@ object DiagnosticLog {
             "W" -> Log.w(TAG, line)
             else -> Log.i(TAG, line)
         }
+    }
+
+    /** Debug 包始终记录；Release 包仅在设置中主动开启调试后记录。 */
+    private fun isEnabled(): Boolean = try {
+        val debugBuild = App.getInstance().applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        debugBuild || Hawk.get(HawkConfig.DEBUG_OPEN, false)
+    } catch (_: Throwable) {
+        false
     }
 
     fun formatTime(timestamp: Long): String =

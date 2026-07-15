@@ -5,6 +5,7 @@ import android.content.Context;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
 import com.hotplato.tvbox.base.App;
+import com.hotplato.tvbox.util.DiagnosticLog;
 
 import org.json.JSONObject;
 
@@ -33,6 +34,7 @@ public class JarLoader {
         boolean success = false;
         try {
             File jar = new File(cache);
+            DiagnosticLog.info("Spider", "Dex 装载开始 file=" + jar.getName() + " bytes=" + jar.length());
             // Android 14+：动态加载的 DEX/JAR 必须为只读，否则抛 SecurityException
             if (jar.exists() && !jar.setReadOnly()) {
                 System.err.println("Failed to set csp.jar read-only: " + jar.getAbsolutePath());
@@ -40,6 +42,7 @@ public class JarLoader {
             File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_csp");
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
+            DiagnosticLog.info("Spider", "Dex 优化目录就绪=" + cacheDir.isDirectory());
             classLoader = new DexClassLoader(jar.getAbsolutePath(), cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());
             // make force wait here, some device async dex load
             int count = 0;
@@ -51,6 +54,7 @@ public class JarLoader {
                         method.invoke(null, SpiderHostContext.get(App.getInstance()));
                         System.out.println("自定义爬虫代码加载成功!");
                         success = true;
+                        DiagnosticLog.info("Spider", "Init.init 成功 attempt=" + (count + 1));
                         try {
                             Class proxy = classLoader.loadClass("com.github.catvod.spider.Proxy");
                             Method mth = proxy.getMethod("proxy", Map.class);
@@ -62,11 +66,13 @@ public class JarLoader {
                     }
                     Thread.sleep(200);
                 } catch (Throwable th) {
+                    DiagnosticLog.warn("Spider", "Init.init 尝试 " + (count + 1) + " 失败: " + th.getClass().getSimpleName() + ": " + th.getMessage());
                     th.printStackTrace();
                 }
                 count++;
             } while (count < 5);
         } catch (Throwable th) {
+            DiagnosticLog.error("Spider", "Dex 装载异常: " + th.getClass().getSimpleName() + ": " + th.getMessage());
             th.printStackTrace();
         }
         return success;
@@ -108,11 +114,14 @@ public class JarLoader {
         }
         String clsKey = cls.startsWith("csp_") ? cls.substring(4) : cls;
         try {
+            DiagnosticLog.info("Spider", "实例化类=" + clsKey + " key=" + key + " extLength=" + (ext == null ? 0 : ext.length()));
             Spider sp = (Spider) classLoader.loadClass("com.github.catvod.spider." + clsKey).newInstance();
             sp.init(SpiderHostContext.get(App.getInstance()), ext);
+            DiagnosticLog.info("Spider", "实例化成功类=" + clsKey + " key=" + key);
             spiders.put(key, sp);
             return sp;
         } catch (Throwable th) {
+            DiagnosticLog.error("Spider", "实例化失败类=" + clsKey + ": " + th.getClass().getSimpleName() + ": " + th.getMessage());
             th.printStackTrace();
             String detail = clsKey + ": " + (th.getMessage() != null ? th.getMessage() : th.getClass().getSimpleName());
             Spider nullSpider = new SpiderNull(SpiderFailReason.JAR_CLASS_INVALID, detail);

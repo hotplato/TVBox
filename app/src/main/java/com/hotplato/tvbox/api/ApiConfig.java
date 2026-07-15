@@ -539,6 +539,11 @@ public class ApiConfig {
         } else if (!foundOldSelect) {
             ijkCodes.get(0).selected(true);
         }
+        DiagnosticLog.info("Config", "解析摘要：sites=" + sourceBeanList.size()
+                + " parses=" + parseBeanList.size()
+                + " liveGroups=" + liveChannelGroupList.size()
+                + " spider=" + (TextUtils.isEmpty(spider) ? "无" : "已配置")
+                + " home=" + (mHomeSource == null ? "无" : mHomeSource.getKey()));
     }
 
     public void loadLives(JsonArray livesArray) {

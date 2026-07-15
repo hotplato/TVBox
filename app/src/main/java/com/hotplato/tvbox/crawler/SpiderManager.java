@@ -50,6 +50,7 @@ public class SpiderManager {
     }
 
     public void reset() {
+        DiagnosticLog.info("Spider", "重置 JAR/JS 爬虫实例与结果缓存");
         jsLoader.clear();
         jarLoader.clearSpiders();
         loggedNullKeys.clear();
@@ -66,6 +67,7 @@ public class SpiderManager {
         }
         String key = sourceBean.getKey();
         String api = sourceBean.getApi();
+        DiagnosticLog.info("Spider", "获取爬虫 key=" + key + " api=" + api);
         if (isJsSpiderApi(api)) {
             Spider sp = jsLoader.getSpider(key, api, sourceBean.getExt(), sourceBean.getJar());
             return logIfNull(key, api, sp);
@@ -97,6 +99,8 @@ public class SpiderManager {
         String jarUrl = urls[0];
         String md5 = urls.length > 1 ? urls[1].trim() : "";
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp.jar");
+        DiagnosticLog.info("Spider", "准备装载 JAR cache=" + cache.getName()
+                + " exists=" + cache.exists() + " useCache=" + useCache + " md5=" + (!md5.isEmpty()));
 
         if ((!md5.isEmpty() || useCache) && cache.exists()) {
             jarLoadExecutor.execute(() -> {
@@ -140,7 +144,8 @@ public class SpiderManager {
                 }
                 JarMd5Index.delete(cache);
                 FileOutputStream fos = new FileOutputStream(cache);
-                fos.write(response.body().bytes());
+                byte[] bytes = response.body().bytes();
+                fos.write(bytes);
                 fos.flush();
                 fos.close();
                 cache.setReadOnly();
@@ -149,6 +154,7 @@ public class SpiderManager {
                 } else {
                     JarMd5Index.write(cache, MD5.getFileMd5(cache));
                 }
+                DiagnosticLog.info("Spider", "JAR 下载完成 bytes=" + bytes.length + " md5=" + (!md5.isEmpty()));
                 return cache;
             }
 
@@ -165,7 +171,8 @@ public class SpiderManager {
             @Override
             public void onError(Response<File> response) {
                 super.onError(response);
-                DiagnosticLog.error("Spider", "JAR 下载失败", System.currentTimeMillis() - startedAt);
+                Throwable exception = response.getException();
+                DiagnosticLog.error("Spider", "JAR 下载失败: " + (exception == null ? "未知错误" : exception.getClass().getSimpleName() + ": " + exception.getMessage()), System.currentTimeMillis() - startedAt);
                 callback.error("");
             }
         });
