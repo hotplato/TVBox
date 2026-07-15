@@ -341,7 +341,7 @@ public class VodController extends BaseController {
 
         void replay();
 
-        void errReplay();
+        void errReplay(String message, boolean retryable);
     }
 
     public void setListener(VodControlListener listener) {
@@ -445,7 +445,10 @@ public class VodController extends BaseController {
             case TvPlayer.STATE_PAUSED:
                 break;
             case TvPlayer.STATE_ERROR:
-                listener.errReplay();
+                listener.errReplay(
+                        mControlWrapper.getErrorMessage(),
+                        mControlWrapper.isErrorRetryable()
+                );
                 break;
             case TvPlayer.STATE_PREPARED:
             case TvPlayer.STATE_BUFFERED:

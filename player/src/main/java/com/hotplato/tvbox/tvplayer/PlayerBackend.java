@@ -14,6 +14,11 @@ public interface PlayerBackend {
 
         void onError();
 
+        /** Backends can supply a specific message and whether retrying is useful. */
+        default void onError(@Nullable String message, boolean retryable) {
+            onError();
+        }
+
         void onInfoPlaying();
 
         void onPaused();

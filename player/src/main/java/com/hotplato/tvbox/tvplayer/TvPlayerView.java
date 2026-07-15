@@ -51,6 +51,9 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
     private boolean isFullScreen;
     private boolean isMute;
     private long seekOnStart;
+    @Nullable
+    private String errorMessage;
+    private boolean errorRetryable = true;
     private final List<OnStateChangeListener> stateListeners = new ArrayList<>();
 
     public interface OnStateChangeListener {
@@ -158,9 +161,11 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
         }
         if (TextUtils.isEmpty(url)) {
             Log.e("TvPlayerView", "start aborted: empty url");
-            setPlayState(TvPlayer.STATE_ERROR);
+            onError("播放地址为空", false);
             return;
         }
+        errorMessage = null;
+        errorRetryable = true;
         setPlayState(TvPlayer.STATE_PREPARING);
         rebuildBackend();
         if (progressStore != null) {
@@ -244,6 +249,13 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
 
     @Override
     public void onError() {
+        onError(null, true);
+    }
+
+    @Override
+    public void onError(@Nullable String message, boolean retryable) {
+        errorMessage = message;
+        errorRetryable = retryable;
         setPlayState(TvPlayer.STATE_ERROR);
     }
 
@@ -298,6 +310,17 @@ public class TvPlayerView extends FrameLayout implements MediaPlayerControl, Pla
     @Override
     public int getBufferedPercentage() {
         return backend == null ? 0 : backend.getBufferedPercentage();
+    }
+
+    @Nullable
+    @Override
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    @Override
+    public boolean isErrorRetryable() {
+        return errorRetryable;
     }
 
     @Override

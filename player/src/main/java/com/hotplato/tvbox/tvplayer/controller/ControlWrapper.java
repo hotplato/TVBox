@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * 此类的目的是为了在ControlComponent中既能调用VideoView的api又能调用BaseVideoController的api，
@@ -53,6 +54,17 @@ public class ControlWrapper implements MediaPlayerControl, IVideoController {
     @Override
     public int getBufferedPercentage() {
         return mPlayerControl.getBufferedPercentage();
+    }
+
+    @Nullable
+    @Override
+    public String getErrorMessage() {
+        return mPlayerControl.getErrorMessage();
+    }
+
+    @Override
+    public boolean isErrorRetryable() {
+        return mPlayerControl.isErrorRetryable();
     }
 
     @Override

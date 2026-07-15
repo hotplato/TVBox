@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -189,8 +190,14 @@ public class PlayActivityLegacy extends BaseActivity {
             }
 
             @Override
-            public void errReplay() {
-                errorWithRetry("视频播放出错", false);
+            public void errReplay(String message, boolean retryable) {
+                String error = TextUtils.isEmpty(message) ? "视频播放出错" : message;
+                if (retryable) {
+                    errorWithRetry(error, false);
+                } else {
+                    autoRetryCount = 0;
+                    runOnUiThread(() -> setTip(error, false, true));
+                }
             }
         });
         mVideoView.setVideoController(mController);

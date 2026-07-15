@@ -1,6 +1,9 @@
 package com.hotplato.tvbox.tvplayer.media3;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,6 +30,9 @@ import java.util.Map;
 @OptIn(markerClass = UnstableApi.class)
 @UnstableApi
 public final class Media3Backend implements PlayerBackend {
+    private static final String TAG = "Media3Backend";
+    private static final long FIRST_FRAME_TIMEOUT_MS = 12_000L;
+
     private final Context appContext;
     private final FrameLayout container;
     private final PlayerView playerView;
@@ -37,6 +43,20 @@ public final class Media3Backend implements PlayerBackend {
     private Listener listener;
     private float speed = 1f;
     private boolean preparing;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean renderedFirstFrame;
+    private final Runnable firstFrameTimeout = new Runnable() {
+        @Override
+        public void run() {
+            if (player == null || renderedFirstFrame || !player.getPlayWhenReady()) return;
+            Log.w(TAG, "video frame was not rendered after decoder initialization");
+            player.setPlayWhenReady(false);
+            preparing = false;
+            if (listener != null) {
+                listener.onError("当前设备不支持该视频编码，请切换播放线路", false);
+            }
+        }
+    };
 
     public Media3Backend(Context context, FrameLayout container, int renderType) {
         this.appContext = context.getApplicationContext();
@@ -65,6 +85,7 @@ public final class Media3Backend implements PlayerBackend {
     @Override
     public void prepare(String url, @Nullable Map<String, String> headers) {
         releasePlayerOnly();
+        renderedFirstFrame = false;
         if (url == null || url.trim().isEmpty()) {
             if (listener != null) listener.onError();
             return;
@@ -73,7 +94,7 @@ public final class Media3Backend implements PlayerBackend {
         try {
             mediaSource = sourceHelper.getMediaSource(url, headers);
         } catch (Exception e) {
-            android.util.Log.e("Media3Backend", "bad media url: " + url, e);
+            Log.e(TAG, "bad media url: " + url, e);
             if (listener != null) listener.onError();
             return;
         }
@@ -106,7 +127,15 @@ public final class Media3Backend implements PlayerBackend {
 
             @Override
             public void onPlayerError(PlaybackException error) {
-                if (listener != null) listener.onError();
+                cancelFirstFrameTimeout();
+                preparing = false;
+                if (listener != null) {
+                    boolean decoderError = isDecoderError(error);
+                    listener.onError(
+                            decoderError ? "当前设备不支持该视频编码，请切换播放线路" : null,
+                            !decoderError
+                    );
+                }
             }
 
             @Override
@@ -114,6 +143,15 @@ public final class Media3Backend implements PlayerBackend {
                 if (listener != null) {
                     listener.onVideoSizeChanged(videoSize.width, videoSize.height);
                 }
+                if (videoSize.width > 0 && videoSize.height > 0 && !renderedFirstFrame) {
+                    scheduleFirstFrameTimeout();
+                }
+            }
+
+            @Override
+            public void onRenderedFirstFrame() {
+                renderedFirstFrame = true;
+                cancelFirstFrameTimeout();
             }
 
             @Override
@@ -219,11 +257,35 @@ public final class Media3Backend implements PlayerBackend {
     }
 
     private void releasePlayerOnly() {
+        cancelFirstFrameTimeout();
         preparing = false;
         if (player != null) {
             playerView.setPlayer(null);
             player.release();
             player = null;
+        }
+    }
+
+    private void scheduleFirstFrameTimeout() {
+        mainHandler.removeCallbacks(firstFrameTimeout);
+        mainHandler.postDelayed(firstFrameTimeout, FIRST_FRAME_TIMEOUT_MS);
+    }
+
+    private void cancelFirstFrameTimeout() {
+        mainHandler.removeCallbacks(firstFrameTimeout);
+    }
+
+    private static boolean isDecoderError(PlaybackException error) {
+        switch (error.errorCode) {
+            case PlaybackException.ERROR_CODE_DECODER_INIT_FAILED:
+            case PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED:
+            case PlaybackException.ERROR_CODE_DECODING_FAILED:
+            case PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES:
+            case PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED:
+            case PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED:
+                return true;
+            default:
+                return false;
         }
     }
 }

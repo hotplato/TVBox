@@ -2,6 +2,8 @@ package com.hotplato.tvbox.tvplayer.controller;
 
 import android.graphics.Bitmap;
 
+import androidx.annotation.Nullable;
+
 public interface MediaPlayerControl {
 
     void start();
@@ -17,6 +19,11 @@ public interface MediaPlayerControl {
     boolean isPlaying();
 
     int getBufferedPercentage();
+
+    @Nullable
+    String getErrorMessage();
+
+    boolean isErrorRetryable();
 
     void startFullScreen();
 
