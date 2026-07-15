@@ -22,6 +22,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.data.SettingsRepository
+import com.hotplato.tvbox.data.WallpaperRepository
 import com.hotplato.tvbox.ui.component.TvFocusButton
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.util.OkGoHelper
@@ -35,6 +36,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val wallpaper by WallpaperRepository.state.collectAsStateWithLifecycle()
+    val wallpaperMessage by viewModel.wallpaperMessage.collectAsStateWithLifecycle()
+    var showWallpaperOptions by remember { mutableStateOf(false) }
     var showApiEditor by remember { mutableStateOf(false) }
     var apiDraft by remember(state.apiUrl) { mutableStateOf(state.apiUrl) }
 
@@ -92,6 +96,18 @@ fun SettingsScreen(
                 "搜索展示",
                 if (state.searchView == 1) "缩略图" else "列表",
             ) { viewModel.cycleSearchView() }
+            SettingRow(
+                "壁纸",
+                when (wallpaper.source) {
+                    WallpaperRepository.SOURCE_WALLHAVEN -> "Wallhaven 安全随机"
+                    WallpaperRepository.SOURCE_BING -> "Bing 每日壁纸"
+                    WallpaperRepository.SOURCE_UPLOAD -> "自定义上传"
+                    else -> "应用默认"
+                },
+            ) { showWallpaperOptions = true }
+            if (wallpaperMessage.isNotBlank()) {
+                Text(wallpaperMessage, color = TvMuted, style = MaterialTheme.typography.bodyMedium)
+            }
             SettingRow("应用设置并重载首页", "点击后重新拉取配置") {
                 SettingsRepository.refresh()
                 onRequestHomeReload()
@@ -149,6 +165,18 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+        }
+    }
+    if (showWallpaperOptions) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showWallpaperOptions = false }) {
+            Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("壁纸设置", style = MaterialTheme.typography.titleLarge)
+                TvFocusButton(text = "Wallhaven 安全随机", onClick = { viewModel.updateWallpaper(WallpaperRepository.SOURCE_WALLHAVEN); showWallpaperOptions = false })
+                TvFocusButton(text = "Bing 每日壁纸", onClick = { viewModel.updateWallpaper(WallpaperRepository.SOURCE_BING); showWallpaperOptions = false })
+                TvFocusButton(text = "更新当前服务", onClick = { viewModel.refreshWallpaper(); showWallpaperOptions = false })
+                TvFocusButton(text = "恢复默认壁纸", onClick = { viewModel.resetWallpaper(); showWallpaperOptions = false })
+                TvFocusButton(text = "取消", onClick = { showWallpaperOptions = false })
             }
         }
     }

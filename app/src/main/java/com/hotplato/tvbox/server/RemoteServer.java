@@ -6,12 +6,14 @@ import android.net.wifi.WifiManager;
 
 import com.google.gson.JsonObject;
 import com.hotplato.tvbox.R;
+import com.hotplato.tvbox.data.WallpaperRepository;
 import com.orhanobut.hawk.Hawk;
 import com.hotplato.tvbox.util.HawkConfig;
 
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -57,9 +59,13 @@ public class RemoteServer extends NanoHTTPD {
             if (session.getMethod() == Method.GET && "/".equals(path)) return raw(R.raw.index, MIME_HTML);
             if (session.getMethod() == Method.GET && "/remote.css".equals(path)) return raw(R.raw.style, "text/css");
             if (session.getMethod() == Method.GET && "/remote.js".equals(path)) return raw(R.raw.script, "application/javascript");
+            if (session.getMethod() == Method.GET && "/wallpaper.html".equals(path)) return raw(R.raw.wallpaper, MIME_HTML);
             if ("/api/v1/health".equals(path) && session.getMethod() == Method.GET) return health();
             if ("/api/v1/pair".equals(path) && session.getMethod() == Method.POST) return pair(body(session));
             if (!authorized(session)) return error(Response.Status.UNAUTHORIZED, "unauthorized", "请先完成电视端配对");
+            if ("/api/v1/wallpaper".equals(path)) return wallpaper(session);
+            if ("/api/v1/wallpaper/refresh".equals(path) && session.getMethod() == Method.POST) return wallpaperResult(WallpaperRepository.refresh());
+            if ("/api/v1/wallpaper/upload".equals(path) && session.getMethod() == Method.POST) return uploadWallpaper(session);
             if ("/api/v1/config".equals(path)) return config(session);
             if ("/api/v1/commands/search".equals(path) && session.getMethod() == Method.POST) return search(body(session));
             if ("/api/v1/quick-play".equals(path) && session.getMethod() == Method.POST) return quickPlay(body(session));
@@ -107,6 +113,47 @@ public class RemoteServer extends NanoHTTPD {
         String reason = receiver.onPlaybackCommand(action, input.optDouble("value", 0));
         if (reason != null) return error(Response.Status.CONFLICT, "unsupported", reason);
         return ok();
+    }
+    private Response wallpaper(IHTTPSession session) throws Exception {
+        if (session.getMethod() == Method.GET) {
+            JsonObject data = new JsonObject();
+            data.addProperty("source", WallpaperRepository.currentSource());
+            data.addProperty("hasWallpaper", WallpaperRepository.hasCache());
+            return json(Response.Status.OK, data);
+        }
+        if (session.getMethod() == Method.DELETE) return wallpaperResult(WallpaperRepository.clear());
+        if (session.getMethod() != Method.PUT) return error(Response.Status.METHOD_NOT_ALLOWED, "method_not_allowed", "仅支持读取、切换或恢复");
+        String provider = body(session).optString("provider", "").trim();
+        return wallpaperResult(WallpaperRepository.applyProvider(provider));
+    }
+    private Response uploadWallpaper(IHTTPSession session) throws Exception {
+        String contentLength = session.getHeaders().get("content-length");
+        if (contentLength != null) try {
+            if (Long.parseLong(contentLength) > WallpaperRepository.MAX_BYTES + 1024L * 1024L) {
+                return error(Response.Status.BAD_REQUEST, "file_too_large", "图片不能超过 20 MiB");
+            }
+        } catch (NumberFormatException ignored) { }
+        Map<String, String> files = new HashMap<>();
+        session.parseBody(files);
+        String path = files.get("file");
+        if (path == null) return error(Response.Status.BAD_REQUEST, "missing_file", "请上传 file 字段");
+        try {
+            return wallpaperResult(WallpaperRepository.applyUpload(new File(path)));
+        } finally {
+            new File(path).delete();
+        }
+    }
+    private Response wallpaperResult(String message) {
+        if (message != null) {
+            Response.Status status = message.contains("不是在线服务") ? Response.Status.CONFLICT : Response.Status.BAD_REQUEST;
+            return error(status, "wallpaper_failed", message);
+        }
+        JsonObject data = new JsonObject();
+        data.addProperty("ok", true);
+        data.addProperty("message", "壁纸已更新");
+        data.addProperty("source", WallpaperRepository.currentSource());
+        data.addProperty("hasWallpaper", WallpaperRepository.hasCache());
+        return json(Response.Status.OK, data);
     }
     private boolean authorized(IHTTPSession session) {
         String header = session.getHeaders().get("authorization"); if (header == null || !header.startsWith("Bearer ")) return false;

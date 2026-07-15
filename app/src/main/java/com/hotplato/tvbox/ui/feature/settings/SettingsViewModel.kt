@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hotplato.tvbox.api.ApiConfig
 import com.hotplato.tvbox.data.SettingsRepository
 import com.hotplato.tvbox.data.SettingsSnapshot
+import com.hotplato.tvbox.data.WallpaperRepository
 import com.hotplato.tvbox.tvplayer.TvPlayer
 import com.hotplato.tvbox.util.OkGoHelper
 import com.hotplato.tvbox.util.PlayerHelper
@@ -12,8 +13,13 @@ import okhttp3.HttpUrl
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class SettingsViewModel : ViewModel() {
+    private val _wallpaperMessage = MutableStateFlow("")
+    val wallpaperMessage: StateFlow<String> = _wallpaperMessage
     val uiState: StateFlow<SettingsSnapshot> = SettingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.settings.value)
 
@@ -74,5 +80,24 @@ class SettingsViewModel : ViewModel() {
     fun cycleSearchView() {
         val next = if (SettingsRepository.settings.value.searchView == 0) 1 else 0
         SettingsRepository.setSearchView(next)
+    }
+
+    fun updateWallpaper(provider: String) {
+        wallpaperTask { WallpaperRepository.applyProvider(provider) }
+    }
+
+    fun refreshWallpaper() {
+        wallpaperTask { WallpaperRepository.refresh() }
+    }
+
+    fun resetWallpaper() {
+        wallpaperTask { WallpaperRepository.clear() }
+    }
+
+    private fun wallpaperTask(task: () -> String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val error = task()
+            _wallpaperMessage.value = error ?: "壁纸已更新"
+        }
     }
 }
