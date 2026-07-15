@@ -409,6 +409,60 @@ public class SourceViewModel extends ViewModel {
             detailResult.postValue(null);
         }
     }
+    public interface SearchCallback {
+        void onResult(AbsXml result);
+    }
+
+    /**
+     * Executes one independent source search. Unlike {@link #getSearch(String, String)}, this
+     * overload does not use the shared "search" tag or publish to searchResult, so callers can
+     * safely issue concurrent searches and associate each result with its source.
+     */
+    public void getSearch(String sourceKey, String wd, Object requestTag, SearchCallback callback) {
+        SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        if (sourceBean == null) {
+            callback.onResult(null);
+            return;
+        }
+        int type = sourceBean.getType();
+        if (type == 3) {
+            SpiderGatewayBridge.searchContent(sourceBean, wd, false, searchJson -> {
+                callback.onResult(searchJson == null ? null : json(null, searchJson, sourceBean.getKey()));
+            });
+        } else if (type == 0 || type == 1 || type == 4) {
+            OkGo.<String>get(sourceBean.getApi())
+                    .params("wd", wd)
+                    .params((type == 1 || type == 4) ? "ac" : null, (type == 1 || type == 4) ? "detail" : null)
+                    .params(type == 4 ? "quick" : null, type == 4 ? "false" : null)
+                    .tag(requestTag)
+                    .execute(new AbsCallback<String>() {
+                        @Override
+                        public String convertResponse(okhttp3.Response response) throws Throwable {
+                            if (response.body() != null) {
+                                return response.body().string();
+                            }
+                            throw new IllegalStateException("网络请求错误");
+                        }
+
+                        @Override
+                        public void onSuccess(Response<String> response) {
+                            String body = response.body();
+                            callback.onResult(type == 0
+                                    ? xml(null, body, sourceBean.getKey())
+                                    : json(null, body, sourceBean.getKey()));
+                        }
+
+                        @Override
+                        public void onError(Response<String> response) {
+                            super.onError(response);
+                            callback.onResult(null);
+                        }
+                    });
+        } else {
+            callback.onResult(null);
+        }
+    }
+
     // searchContent
     public void getSearch(String sourceKey, String wd) {
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
