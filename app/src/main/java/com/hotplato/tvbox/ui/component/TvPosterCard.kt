@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
@@ -31,13 +32,14 @@ fun TvPosterCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    cardWidth: Dp = 192.dp,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(12.dp)
     Surface(
         onClick = onClick,
         modifier = modifier
-            .width(160.dp)
+            .width(cardWidth)
             .onFocusChanged { focused = it.isFocused }
             .then(if (focused) Modifier.border(2.dp, TvFocusBorder, shape) else Modifier),
         colors = ClickableSurfaceDefaults.colors(
@@ -45,22 +47,22 @@ fun TvPosterCard(
             focusedContainerColor = TvSurface,
             pressedContainerColor = TvSurface,
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             VodCoverImage(
                 pic = imageUrl,
                 contentDescription = title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.7f)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(10.dp)),
             )
             Text(
                 text = title.take(40),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 10.dp),
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(

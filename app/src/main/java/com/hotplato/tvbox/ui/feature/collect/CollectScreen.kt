@@ -55,7 +55,7 @@ fun CollectScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 32.dp, vertical = 24.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -89,9 +89,9 @@ fun CollectScreen(
             state.items.isEmpty() -> EmptyState("暂无收藏")
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(5),
-                contentPadding = PaddingValues(4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(6.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(state.items, key = { it.id }) { item ->

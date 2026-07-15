@@ -105,7 +105,11 @@ fun HomeScreen(
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 24.dp),
+    ) {
         HomeTopBar(
             homeName = state.homeName,
             sortLabels = state.sorts.map { it.name ?: it.id },
@@ -132,9 +136,9 @@ fun HomeScreen(
                 )
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
-                    contentPadding = PaddingValues(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(

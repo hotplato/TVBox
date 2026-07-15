@@ -65,7 +65,7 @@ fun DetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(horizontal = 32.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -76,18 +76,20 @@ fun DetailScreen(
                         selected = state.collected,
                     )
                 }
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
                     VodCoverImage(
                         pic = info.pic,
                         contentDescription = info.name,
                         modifier = Modifier
-                            .width(180.dp)
-                            .height(260.dp)
-                            .clip(RoundedCornerShape(10.dp)),
+                            .width(192.dp)
+                            .height(272.dp)
+                            .clip(RoundedCornerShape(12.dp)),
                     )
                     Column(
                         modifier = Modifier
-                            .padding(start = 20.dp)
                             .weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -112,7 +114,7 @@ fun DetailScreen(
                         )
                     }
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(state.flags) { flag ->
                         TvFocusButton(
                             text = flag,
@@ -124,8 +126,8 @@ fun DetailScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
                     contentPadding = PaddingValues(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
@@ -142,6 +144,7 @@ fun DetailScreen(
                                 context.startActivity(intent)
                             },
                             selected = ep.selected,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }

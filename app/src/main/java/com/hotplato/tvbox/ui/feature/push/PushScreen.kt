@@ -40,8 +40,8 @@ fun PushScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .padding(horizontal = 32.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvFocusButton(text = "返回", onClick = onBack)
@@ -52,7 +52,7 @@ fun PushScreen(
             )
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(32.dp),
+            horizontalArrangement = Arrangement.spacedBy(40.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -60,10 +60,10 @@ fun PushScreen(
                 Image(
                     bitmap = qrBitmap.asImageBitmap(),
                     contentDescription = "推送二维码",
-                    modifier = Modifier.size(280.dp),
+                    modifier = Modifier.size(300.dp),
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(
                     text = "手机/电脑扫描二维码，或在浏览器访问：",
                     style = MaterialTheme.typography.bodyLarge,

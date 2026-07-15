@@ -28,11 +28,15 @@ import com.hotplato.tvbox.util.DiagnosticLog
 fun DiagnosticsLogScreen(onBack: () -> Unit) {
     val entries by DiagnosticLog.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 24.dp),
+    ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 16.dp),
+            modifier = Modifier.padding(bottom = 20.dp),
         ) {
             TvFocusButton(text = "返回", onClick = onBack)
             Text(text = "运行日志", style = MaterialTheme.typography.headlineMedium)
@@ -44,7 +48,7 @@ fun DiagnosticsLogScreen(onBack: () -> Unit) {
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(entries, key = { it.timestamp.toString() + it.message }) { entry ->
                     Column(Modifier.fillMaxWidth()) {

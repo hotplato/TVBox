@@ -41,12 +41,12 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 32.dp, vertical = 24.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 16.dp),
+            modifier = Modifier.padding(bottom = 20.dp),
         ) {
             TvFocusButton(text = "返回", onClick = onBack)
             Text(text = "设置", style = MaterialTheme.typography.headlineMedium)
@@ -56,7 +56,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SettingRow("配置地址", state.apiUrl.ifBlank { "未设置" }) {
                 showApiEditor = true
@@ -123,7 +123,7 @@ fun SettingsScreen(
         androidx.compose.ui.window.Dialog(onDismissRequest = { showApiEditor = false }) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(32.dp)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -133,7 +133,7 @@ fun SettingsScreen(
                     onValueChange = { apiDraft = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(16.dp),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onBackground,
                     ),

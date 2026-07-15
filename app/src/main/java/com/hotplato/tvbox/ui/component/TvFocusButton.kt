@@ -29,7 +29,7 @@ fun TvFocusButton(
     selected: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(10.dp)
     Surface(
         onClick = onClick,
         modifier = modifier
@@ -44,12 +44,12 @@ fun TvFocusButton(
             focusedContentColor = Color.White,
             pressedContentColor = Color.White,
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             style = MaterialTheme.typography.labelLarge,
         )
     }

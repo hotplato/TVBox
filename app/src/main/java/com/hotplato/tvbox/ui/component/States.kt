@@ -32,7 +32,7 @@ fun LoadingState(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(horizontal = 32.dp, vertical = 24.dp),
         ) {
             TvFocusButton(text = "返回", onClick = onBack)
             Box(
@@ -75,7 +75,7 @@ fun ErrorState(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 32.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -85,8 +85,8 @@ fun ErrorState(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Row(
-            modifier = Modifier.padding(top = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(top = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (onBack != null) {
                 TvFocusButton(text = "返回", onClick = onBack)

@@ -25,8 +25,8 @@ fun TvCategoryTabRow(
     }
     LazyRow(
         state = listState,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp),
         modifier = modifier,
     ) {
         itemsIndexed(labels) { index, label ->
