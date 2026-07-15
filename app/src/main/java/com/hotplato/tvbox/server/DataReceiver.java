@@ -1,19 +1,13 @@
 package com.hotplato.tvbox.server;
 
-/**
- * @author pj567
- * @date :2021/1/5
- * @description:
- */
+import com.google.gson.JsonObject;
+
 public interface DataReceiver {
-
-    /**
-     * @param text
-     */
     void onTextReceived(String text);
-
-
     void onApiReceived(String url);
-
     void onPushReceived(String url);
+    void onQuickPlayReceived(String url, String title);
+    /** null means command handled. */
+    String onPlaybackCommand(String action, double value);
+    JsonObject getPlaybackState();
 }

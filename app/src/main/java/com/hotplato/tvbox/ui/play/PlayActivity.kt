@@ -29,6 +29,10 @@ import com.hotplato.tvbox.ui.theme.TvTheme
  * with an optional Compose chrome overlay (Menu toggles).
  */
 class PlayActivity : PlayActivityLegacy() {
+    companion object {
+        const val EXTRA_REMOTE_URL = "remote_play_url"
+        const val EXTRA_REMOTE_TITLE = "remote_play_title"
+    }
     private var chromeVisible by mutableStateOf(false)
     private var composeHost: ComposeView? = null
 

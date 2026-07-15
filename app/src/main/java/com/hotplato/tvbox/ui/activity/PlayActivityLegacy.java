@@ -4,6 +4,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.graphics.Color;
 import android.net.http.SslError;
 import android.os.Build;
@@ -45,6 +46,8 @@ import com.hotplato.tvbox.bean.VodInfo;
 import com.hotplato.tvbox.cache.CacheManager;
 import com.hotplato.tvbox.event.RefreshEvent;
 import com.hotplato.tvbox.player.controller.VodController;
+import com.hotplato.tvbox.server.RemotePlaybackBridge;
+import com.hotplato.tvbox.ui.play.PlayActivity;
 import com.hotplato.tvbox.tvplayer.ProgressStore;
 import com.hotplato.tvbox.tvplayer.TvPlayerView;
 import com.hotplato.tvbox.util.AdBlocker;
@@ -179,7 +182,7 @@ public class PlayActivityLegacy extends BaseActivity {
 
             @Override
             public void updatePlayerCfg() {
-                mVodInfo.playerCfg = mVodPlayerCfg.toString();
+                if (mVodInfo != null) mVodInfo.playerCfg = mVodPlayerCfg.toString();
                 EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_REFRESH, mVodPlayerCfg));
             }
 
@@ -322,6 +325,28 @@ public class PlayActivityLegacy extends BaseActivity {
         Intent intent = getIntent();
         if (intent != null && intent.getExtras() != null) {
             Bundle bundle = intent.getExtras();
+            String remoteUrl = bundle.getString(PlayActivity.EXTRA_REMOTE_URL, "");
+            if (!TextUtils.isEmpty(remoteUrl)) {
+                mVodInfo = new VodInfo();
+                mVodInfo.playerCfg = "{}";
+                initPlayerCfg();
+                mController.setTitle(bundle.getString(PlayActivity.EXTRA_REMOTE_TITLE, "远程播放"));
+                if (DefaultConfig.isVideoFormat(remoteUrl)) {
+                    playUrl(remoteUrl, null);
+                } else if (remoteUrl.startsWith("magnet:") || remoteUrl.startsWith("thunder://")) {
+                    Thunder.parse(this, remoteUrl, new Thunder.ThunderCallback() {
+                        @Override public void status(int code, String info) { runOnUiThread(() -> setTip(info, code >= 0, code < 0)); }
+                        @Override public void list(String playList) { }
+                        @Override public void play(String url) { playUrl(url, null); }
+                    });
+                } else if (remoteUrl.startsWith("http://") || remoteUrl.startsWith("https://")) {
+                    if (ApiConfig.get().getDefaultParse() == null) setTip("未配置默认解析器", false, true);
+                    else initParse("remote", true, "", remoteUrl);
+                } else {
+                    setTip("不支持的播放地址", false, true);
+                }
+                return;
+            }
             mVodInfo = (VodInfo) bundle.getSerializable("VodInfo");
             sourceKey = bundle.getString("sourceKey");
             sourceBean = ApiConfig.get().getSource(sourceKey);
@@ -384,6 +409,7 @@ public class PlayActivityLegacy extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        RemotePlaybackBridge.register(remoteTarget);
         if (mVideoView != null) {
             mVideoView.resume();
         }
@@ -400,6 +426,7 @@ public class PlayActivityLegacy extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        RemotePlaybackBridge.unregister(remoteTarget);
         super.onDestroy();
         if (mVideoView != null) {
             mVideoView.release();
@@ -413,6 +440,37 @@ public class PlayActivityLegacy extends BaseActivity {
     private JSONObject mVodPlayerCfg;
     private String sourceKey;
     private SourceBean sourceBean;
+    private final RemotePlaybackBridge.Target remoteTarget = new RemotePlaybackBridge.Target() {
+        @Override public String command(String action, double value) {
+            if (mVideoView == null) return "当前没有可控制的播放器";
+            runOnUiThread(() -> {
+                long pos = mVideoView.getCurrentPosition();
+                switch (action) {
+                    case "play": mVideoView.start(); break;
+                    case "pause": mVideoView.pause(); break;
+                    case "stop": mVideoView.release(); break;
+                    case "seek_relative": mVideoView.seekTo(Math.max(0, pos + (long) value * 1000L)); break;
+                    case "seek": mVideoView.seekTo(Math.max(0, (long) value * 1000L)); break;
+                    case "speed": mVideoView.setSpeed((float) Math.max(0.5, Math.min(2.0, value))); break;
+                    case "volume": {
+                        AudioManager audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                        if (audio != null) audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, value >= 0 ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER, 0);
+                        break;
+                    }
+                }
+            });
+            switch (action) {
+                case "play": case "pause": case "stop": case "seek_relative": case "seek": case "speed": case "volume": return null;
+                default: return "不支持的播放控制";
+            }
+        }
+        @Override public com.google.gson.JsonObject state() {
+            com.google.gson.JsonObject state = new com.google.gson.JsonObject();
+            state.addProperty("available", mVideoView != null);
+            if (mVideoView != null) { state.addProperty("playing", mVideoView.isPlaying()); state.addProperty("position", mVideoView.getCurrentPosition() / 1000d); state.addProperty("duration", mVideoView.getDuration() / 1000d); }
+            return state;
+        }
+    };
 
     private void playNext() {
         boolean hasNext = true;

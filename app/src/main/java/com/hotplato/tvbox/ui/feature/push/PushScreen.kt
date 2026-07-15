@@ -1,8 +1,5 @@
 package com.hotplato.tvbox.ui.feature.push
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -12,11 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -24,66 +24,29 @@ import com.hotplato.tvbox.server.ControlManager
 import com.hotplato.tvbox.ui.component.TvFocusButton
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.tv.QRCodeGen
+import kotlinx.coroutines.delay
 
 @Composable
-fun PushScreen(
-    onOpenDetail: (sourceKey: String, vodId: String) -> Unit,
-    onBack: () -> Unit,
-) {
-    val context = LocalContext.current
-    val address = remember { ControlManager.get().getAddress(false) ?: "" }
-    val qrBitmap: Bitmap? = remember(address) {
-        if (address.isBlank()) null
-        else QRCodeGen.generateBitmap(address, 320, 320, 4)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+fun PushScreen(onOpenDetail: (sourceKey: String, vodId: String) -> Unit, onBack: () -> Unit) {
+    val manager = ControlManager.get()
+    val address = remember { manager.getAddress(false) }
+    val qrBitmap: Bitmap? = remember(address) { address.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }?.let { QRCodeGen.generateBitmap(it, 320, 320, 4) } }
+    var remaining by remember { mutableLongStateOf(manager.pairingRemainingSeconds) }
+    LaunchedEffect(Unit) { while (true) { remaining = manager.pairingRemainingSeconds; delay(1000) } }
+    Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             TvFocusButton(text = "返回", onClick = onBack)
-            Text(
-                text = "远程推送",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(start = 8.dp),
-            )
+            Text("远程控制", style = MaterialTheme.typography.headlineMedium)
         }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(40.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (qrBitmap != null) {
-                Image(
-                    bitmap = qrBitmap.asImageBitmap(),
-                    contentDescription = "推送二维码",
-                    modifier = Modifier.size(300.dp),
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Text(
-                    text = "手机/电脑扫描二维码，或在浏览器访问：",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = TvMuted,
-                )
-                Text(
-                    text = address,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                TvFocusButton(
-                    text = "推送剪贴板内容",
-                    onClick = {
-                        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        val text = manager?.primaryClip?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)?.text?.toString()?.trim()
-                        if (!text.isNullOrBlank()) {
-                            onOpenDetail("push_agent", text)
-                        }
-                    },
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(44.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (qrBitmap != null) Image(qrBitmap.asImageBitmap(), "远程控制二维码", Modifier.size(300.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Text(if (qrBitmap == null) "未检测到局域网地址" else "扫码或在浏览器访问：", color = TvMuted, style = MaterialTheme.typography.bodyLarge)
+                Text(address.ifBlank { "服务尚未启动" }, style = MaterialTheme.typography.titleLarge)
+                Text("配对码", style = MaterialTheme.typography.titleMedium, color = TvMuted)
+                Text(manager.pairingCode, style = MaterialTheme.typography.displayMedium)
+                Text("${remaining}s 后过期", color = TvMuted, style = MaterialTheme.typography.bodyLarge)
+                TvFocusButton(text = "刷新配对码", onClick = { manager.refreshPairingCode(); remaining = manager.pairingRemainingSeconds })
             }
         }
     }

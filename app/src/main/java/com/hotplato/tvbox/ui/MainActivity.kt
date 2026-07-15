@@ -29,6 +29,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         hideSystemBars()
         pendingRoute = intentToRoute(intent)
+        if (intent.getBooleanExtra(EXTRA_REMOTE_CONFIG_CHANGED, false)) {
+            homeViewModel.bootstrap(false)
+        }
         setContent {
             TvTheme {
                 Surface(
@@ -58,6 +61,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingRoute = intentToRoute(intent)
+        if (intent.getBooleanExtra(EXTRA_REMOTE_CONFIG_CHANGED, false)) {
+            homeViewModel.bootstrap(false)
+        }
     }
 
     override fun onResume() {
@@ -77,5 +83,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_ROUTE = "compose_route"
         const val EXTRA_QUERY = "compose_query"
         const val ROUTE_SEARCH = "search"
+        const val EXTRA_REMOTE_CONFIG_CHANGED = "remote_config_changed"
     }
 }

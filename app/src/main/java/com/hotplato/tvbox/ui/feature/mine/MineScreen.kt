@@ -38,7 +38,7 @@ fun MineScreen(
         }
         TvFocusButton(text = "历史记录", onClick = onOpenHistory, modifier = Modifier.fillMaxWidth())
         TvFocusButton(text = "我的收藏", onClick = onOpenCollect, modifier = Modifier.fillMaxWidth())
-        TvFocusButton(text = "推送", onClick = onOpenPush, modifier = Modifier.fillMaxWidth())
+        TvFocusButton(text = "远程控制", onClick = onOpenPush, modifier = Modifier.fillMaxWidth())
         TvFocusButton(text = "设置", onClick = onOpenSettings, modifier = Modifier.fillMaxWidth())
     }
 }
