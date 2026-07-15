@@ -23,6 +23,7 @@ data class DetailUiState(
     val flags: List<String> = emptyList(),
     val selectedFlag: String? = null,
     val episodes: List<VodInfo.VodSeries> = emptyList(),
+    val selectedEpisodeIndex: Int = 0,
     val collected: Boolean = false,
 )
 
@@ -40,28 +41,41 @@ class DetailViewModel : ViewModel() {
             return@Observer
         }
         val video = abs!!.movie.videoList[0]
+        val requestedSourceKey = sourceKey
+        val requestedVodId = vodId
         val info = VodInfo()
         info.setVideo(video)
-        info.sourceKey = sourceKey
-        val flags = info.seriesFlags?.map { it.name } ?: emptyList()
-        val flag = info.playFlag ?: flags.firstOrNull()
-        info.playFlag = flag
-        val episodes = if (flag != null) info.seriesMap[flag] ?: emptyList() else emptyList()
-        _uiState.update {
-            it.copy(
-                loading = false,
-                error = null,
-                vodInfo = info,
-                flags = flags.filterNotNull(),
-                selectedFlag = flag,
-                episodes = episodes,
-            )
-        }
+        info.sourceKey = requestedSourceKey
         viewModelScope.launch {
-            val collected = withContext(Dispatchers.IO) {
-                RoomDataManger.getAllVodCollect().any { it.sourceKey == sourceKey && it.vodId == vodId }
+            val (record, collected) = withContext(Dispatchers.IO) {
+                RoomDataManger.getVodInfo(requestedSourceKey, requestedVodId) to
+                    RoomDataManger.getAllVodCollect().any {
+                        it.sourceKey == requestedSourceKey && it.vodId == requestedVodId
+                    }
             }
-            _uiState.update { it.copy(collected = collected) }
+            // The detail response may arrive after navigation has moved to another item.
+            if (this@DetailViewModel.sourceKey != requestedSourceKey ||
+                this@DetailViewModel.vodId != requestedVodId
+            ) {
+                return@launch
+            }
+
+            restorePlaybackSelection(info, record)
+            val flags = info.seriesFlags?.mapNotNull { it.name } ?: emptyList()
+            val flag = info.playFlag
+            val episodes = flag?.let { info.seriesMap?.get(it) }.orEmpty()
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    error = null,
+                    vodInfo = info,
+                    flags = flags,
+                    selectedFlag = flag,
+                    episodes = episodes,
+                    selectedEpisodeIndex = info.playIndex,
+                    collected = collected,
+                )
+            }
         }
     }
 
@@ -84,9 +98,14 @@ class DetailViewModel : ViewModel() {
         val info = _uiState.value.vodInfo ?: return
         info.playFlag = flag
         info.playIndex = 0
-        val episodes = info.seriesMap[flag] ?: emptyList()
+        val episodes = info.seriesMap?.get(flag).orEmpty()
         _uiState.update {
-            it.copy(selectedFlag = flag, episodes = episodes, vodInfo = info)
+            it.copy(
+                selectedFlag = flag,
+                episodes = episodes,
+                selectedEpisodeIndex = 0,
+                vodInfo = info,
+            )
         }
     }
 
@@ -110,12 +129,32 @@ class DetailViewModel : ViewModel() {
         val info = _uiState.value.vodInfo ?: return null
         val episodes = _uiState.value.episodes
         if (episodes.isEmpty() || index !in episodes.indices) return null
-        episodes.forEachIndexed { i, ep -> ep.selected = i == index }
         info.playIndex = index
+        _uiState.update { it.copy(selectedEpisodeIndex = index, vodInfo = info) }
         viewModelScope.launch(Dispatchers.IO) {
             RoomDataManger.insertVodRecord(sourceKey, info)
         }
         return info
+    }
+
+    /** Applies the same record compatibility rules as the legacy detail screen. */
+    private fun restorePlaybackSelection(info: VodInfo, record: VodInfo?) {
+        if (record != null) {
+            info.playFlag = record.playFlag
+            info.playIndex = record.playIndex.coerceAtLeast(0)
+            info.playerCfg = record.playerCfg
+            info.reverseSort = record.reverseSort
+        }
+
+        if (info.reverseSort && !info.seriesMap.isNullOrEmpty()) info.reverse()
+
+        val flags = info.seriesFlags?.mapNotNull { it.name }.orEmpty()
+        val selectedFlag = info.playFlag?.takeIf { it in flags } ?: flags.firstOrNull()
+        info.playFlag = selectedFlag
+        val episodes = selectedFlag?.let { info.seriesMap?.get(it) }.orEmpty()
+        if (episodes.isEmpty() || info.playIndex !in episodes.indices) {
+            info.playIndex = 0
+        }
     }
 
     override fun onCleared() {
