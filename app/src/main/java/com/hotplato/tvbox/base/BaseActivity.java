@@ -168,7 +168,8 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     public float getSizeInDp() {
-        return isBaseOnWidth() ? 1280 : 720;
+        // 缩小设计基准，使遗留 XML / mm 尺寸与 Compose UI 同步放大 20%。
+        return isBaseOnWidth() ? 1280f / 1.2f : 720f / 1.2f;
     }
 
     @Override
