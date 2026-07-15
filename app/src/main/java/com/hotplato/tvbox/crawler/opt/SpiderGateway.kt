@@ -68,7 +68,7 @@ object SpiderGateway {
         SpiderResultCache.get(cacheKey)?.let { logCacheHit(sourceBean, "player"); return it }
         val raw = invokeNoCache(sourceBean, "player flag=$flag urlLength=${url.length}") { sp ->
             sp.playerContent(flag, url, vipFlags)
-        } ?: return null
+        }?.takeIf { it.isNotBlank() } ?: return null
         val normalized = try {
             PlayUrlFastPath.normalize(JSONObject(raw))?.toString() ?: raw
         } catch (_: Throwable) {

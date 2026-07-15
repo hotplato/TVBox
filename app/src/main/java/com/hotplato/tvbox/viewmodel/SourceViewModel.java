@@ -580,7 +580,8 @@ public class SourceViewModel extends ViewModel {
         if (type == 3) {
             SpiderGatewayBridge.playerContent(sourceBean, playFlag, url, json -> {
                 try {
-                    if (json == null) {
+                    if (json == null || json.trim().isEmpty()) {
+                        LOG.i("getPlay: spider returned an empty player response, key=" + sourceKey + ", flag=" + playFlag);
                         playResult.postValue(null);
                         return;
                     }
