@@ -1,6 +1,7 @@
 package com.hotplato.tvbox.ui.feature.home
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -117,7 +118,13 @@ fun HomeScreen(
             onSelectSort = viewModel::selectSort,
             onOpenSourcePicker = { showSourcePicker = true },
             onOpenSearch = { onOpenSearch(null) },
-            onOpenLive = { context.startActivity(Intent(context, LivePlayActivity::class.java)) },
+            onOpenLive = {
+                if (ApiConfig.get().channelGroupList.isEmpty()) {
+                    Toast.makeText(context, "当前配置未提供直播频道", Toast.LENGTH_SHORT).show()
+                } else {
+                    context.startActivity(Intent(context, LivePlayActivity::class.java))
+                }
+            },
             onOpenMine = onOpenMine,
             mineFocusRequester = mineFocusRequester,
         )

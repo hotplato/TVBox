@@ -593,7 +593,10 @@ public class ApiConfig {
                 liveChannelItem.setChannelUrls(sourceUrls);
                 liveChannelGroup.getLiveChannels().add(liveChannelItem);
             }
-            liveChannelGroupList.add(liveChannelGroup);
+            // 空分组无法播放，保留它会让直播页在选择默认频道时越界。
+            if (!liveChannelGroup.getLiveChannels().isEmpty()) {
+                liveChannelGroupList.add(liveChannelGroup);
+            }
         }
     }
 

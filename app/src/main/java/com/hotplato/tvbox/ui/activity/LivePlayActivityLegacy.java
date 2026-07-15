@@ -777,8 +777,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-            finish();
+            showLiveChannelsEmpty();
             return;
         }
 
@@ -808,8 +807,7 @@ public class LivePlayActivityLegacy extends BaseActivity {
                 ApiConfig.get().loadLives(livesArray);
                 List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
                 if (list.isEmpty()) {
-                    Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-                    finish();
+                    showLiveChannelsEmpty();
                     return;
                 }
                 liveChannelGroupList.clear();
@@ -823,7 +821,17 @@ public class LivePlayActivityLegacy extends BaseActivity {
                     }
                 });
             }
+
+            @Override
+            public void onError(Response<String> response) {
+                showLiveChannelsEmpty();
+            }
         });
+    }
+
+    private void showLiveChannelsEmpty() {
+        Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
+        showEmpty();
     }
 
     private void initLiveState() {
