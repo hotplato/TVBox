@@ -1,6 +1,7 @@
 package com.hotplato.tvbox.ui.feature.home
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,8 +37,6 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import com.hotplato.tvbox.ui.component.TvCategoryTabRow
-import com.hotplato.tvbox.ui.component.TvFocusButton
 import com.hotplato.tvbox.ui.theme.TvFocusBorder
 import com.hotplato.tvbox.ui.theme.TvMuted
 import com.hotplato.tvbox.ui.theme.TvPrimary
@@ -63,12 +66,9 @@ fun HomeTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TvFocusButton(
-                text = homeName.ifBlank { "TVBox" }.let { name ->
-                    if (name.length > 12) name.take(12) + "…" else name
-                },
+            HomeSourceButton(
+                homeName = homeName,
                 onClick = onOpenSourcePicker,
-                modifier = Modifier.widthIn(max = 240.dp),
             )
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
             HomeShortcutButton(
@@ -89,12 +89,101 @@ fun HomeTopBar(
                     .focusRequester(mineFocusRequester),
             )
         }
-        TvCategoryTabRow(
+        HomeCategoryTabRow(
             labels = sortLabels,
             selectedIndex = selectedSortIndex,
             onSelect = onSelectSort,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun HomeSourceButton(
+    homeName: String,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .widthIn(max = 240.dp)
+            .height(48.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .then(if (focused) Modifier.border(2.dp, TvFocusBorder, shape) else Modifier)
+            .focusable(),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.White.copy(alpha = 0.10f),
+            focusedContainerColor = TvPrimary,
+            pressedContainerColor = TvPrimary.copy(alpha = 0.86f),
+            contentColor = Color.White,
+            focusedContentColor = Color.White,
+            pressedContentColor = Color.White,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+        shape = ClickableSurfaceDefaults.shape(shape = shape),
+    ) {
+        Text(
+            text = homeName.ifBlank { "TVBox" }.let { name ->
+                if (name.length > 12) name.take(12) + "…" else name
+            },
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+@Composable
+private fun HomeCategoryTabRow(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex in labels.indices) listState.animateScrollToItem(selectedIndex)
+    }
+    LazyRow(
+        state = listState,
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        itemsIndexed(labels) { index, label ->
+            var focused by remember { mutableStateOf(false) }
+            val shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+            Surface(
+                onClick = { onSelect(index) },
+                modifier = Modifier
+                    .onFocusChanged { focused = it.isFocused }
+                    .then(if (focused) Modifier.border(1.dp, TvFocusBorder, shape) else Modifier)
+                    .focusable(),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.White.copy(alpha = if (index == selectedIndex) 0.18f else 0.06f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.20f),
+                    pressedContainerColor = TvPrimary.copy(alpha = 0.82f),
+                    contentColor = TvMuted,
+                    focusedContentColor = Color.White,
+                    pressedContentColor = Color.White,
+                ),
+                shape = ClickableSurfaceDefaults.shape(shape = shape),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .width(24.dp)
+                            .height(2.dp)
+                            .background(if (index == selectedIndex) Color.White else Color.Transparent),
+                    )
+                }
+            }
+        }
     }
 }
 
