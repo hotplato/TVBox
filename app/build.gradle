@@ -5,6 +5,12 @@ plugins {
     id 'com.google.devtools.ksp'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 android {
     namespace 'com.hotplato.tvbox'
     compileSdk 35
@@ -33,6 +39,18 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            def storePath = localProperties['KEYSTORE_FILE']
+            if (storePath) {
+                storeFile rootProject.file(storePath)
+                storePassword localProperties['KEYSTORE_PASSWORD']
+                keyAlias localProperties['KEY_ALIAS']
+                keyPassword localProperties['KEY_PASSWORD']
+            }
+        }
+    }
+
     buildTypes {
         debug {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -41,6 +59,9 @@ android {
         release {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             minifyEnabled true
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
